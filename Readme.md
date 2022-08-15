@@ -5,7 +5,7 @@ A simple neural network that knows how to play chess written in Python.
 ## What data was used for training?
 
 The data I used to train the model was a bunch of recorded Grandmaster games taken from [this website](https://www.pgnmentor.com/files.html).
-All of the games I used to train the model can be found in the [data/](https://github.com/fymue/jlchessbot/tree/main/data)-folder.
+All of the games I used to train the model can be found under [data](https://github.com/fymue/pychessbot/tree/main/data).
 
 ## How was the model trained?
 
