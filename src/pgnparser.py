@@ -18,7 +18,7 @@ class PGNParser:
             # parse every pgn (containing multiple games) and store each game as well as the winner
             pgns = [self.parse_pgn(pgn_dir + pgn_file) for pgn_file in os.listdir(pgn_dir) if pgn_file.endswith(".pgn")]
 
-            X = np.empty((self.size, 8, 8, 6), dtype=np.int8)
+            X = np.empty((self.size, 6, 8, 8), dtype=np.int8)
             y = np.empty(self.size, dtype=np.uint8)
 
             i = 0 # counter for all board states added to X
@@ -50,7 +50,7 @@ class PGNParser:
                         offset = 0 if len(moves_played) % 2 != 0 else 1
                         random_move = tuple(random_board.legal_moves)[np.random.randint(0, random_board.legal_moves.count())]
                         random_board.push(random_move)
-                        bad_board_state = self.convert_board_to_tensor(random_board)
+                        bad_board_state = self.convert_board_to_tensor(random_board, winner)
                         X[i] = good_board_state
                         y[i] = 0
                         i += 1
@@ -61,12 +61,12 @@ class PGNParser:
                         # (because all games are GrandMaster games and thus (early) moves are not necessarily bad)
 
                         game_board.push(moves_played[move])
-                        good_board_state = self.convert_board_to_tensor(game_board)
+                        good_board_state = self.convert_board_to_tensor(game_board, winner)
 
                         random_board.set_fen(game_board.fen())
                         random_move = tuple(random_board.legal_moves)[np.random.randint(0, random_board.legal_moves.count())]
                         random_board.push(random_move)
-                        bad_board_state = self.convert_board_to_tensor(random_board)
+                        bad_board_state = self.convert_board_to_tensor(random_board, winner)
 
                         game_board.push(moves_played[move+1])
 
@@ -82,7 +82,7 @@ class PGNParser:
 
                         move += 2
                         game_board.push(moves_played[move])
-                        good_board_state = self.convert_board_to_tensor(game_board)
+                        good_board_state = self.convert_board_to_tensor(game_board, winner)
 
                         X[i] = good_board_state
                         y[i] = 1
@@ -100,7 +100,7 @@ class PGNParser:
         pgn = open(pgn_file)
         game = chess.pgn.read_game(pgn)
 
-        while game != None and self.size <= self.max_size:
+        while game != None and self.size < self.max_size:
             res = game.headers["Result"]
 
             match res:
@@ -118,11 +118,22 @@ class PGNParser:
 
         return games
     
-    def convert_board_to_tensor(self, state):
+    def convert_board_to_tensor(self, board, winner):
         # convert the current board state to a
         # 8x8x6 tensor (1 8x8 board for every figure)
 
-        board_state = np.zeros((8, 8, 6), dtype=np.int8)
+        board_state = np.zeros((6, 8, 8), dtype=np.int8)
+        piece_map = board.piece_map()
+        white_val = 1 if winner == chess.WHITE else -1
+        black_val = -white_val
+        layer_indices = {"k" : 0, "p" : 1, "r" : 2, "b" : 3, "n" : 4, "q" : 5}
+
+        for pos in piece_map:
+            curr_piece = piece_map[pos].symbol()
+            row = np.abs(pos // 8 - 7)
+            col = pos % 8
+            layer = layer_indices[curr_piece.lower()]
+            board_state[layer, row, col] = white_val if curr_piece.isupper() else black_val
 
         return board_state
 
@@ -130,12 +141,13 @@ class PGNParser:
         # save the training data to a .npz file
         # so it doesn't have to be recalculated every time
 
-        np.savez(self.data_path + "training_data", X=X, y=y)
+        np.savez(f"{self.data_path}training_data_{self.max_size}", X=X, y=y)
 
 
 
 if __name__ == "__main__": 
-    pgn_parser = PGNParser(max_size=1000)
+    pgn_parser = PGNParser()
     pgn_parser.save_training_data(pgn_parser.X, pgn_parser.y)
+
 
     
