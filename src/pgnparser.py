@@ -86,7 +86,7 @@ class PGNParser:
                         y[i] = 1 # "good" moves get a 1
 
                         X[i+1] = bad_board_state
-                        y[i] = 0 # "bad" moves get a 0 
+                        y[i+1] = 0 # "bad" moves get a 0 
 
                         i += 2
                     
@@ -170,7 +170,7 @@ class PGNParser:
 
 
 if __name__ == "__main__": 
-    pgn_parser = PGNParser(max_size=1000)
+    pgn_parser = PGNParser(max_size=1000000)
     pgn_parser.save_training_data(pgn_parser.X, pgn_parser.y)
 
 
