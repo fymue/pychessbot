@@ -105,6 +105,7 @@ class PGNParser:
                         y[i] = 1
 
                         i += 1
+
             print(f"[File {fc}/{len(pgns)}] Finished! Parsed {gc}/{len(pgn)} games resulting in checkmate ({i} board state samples generated)\n")
 
             return X, y
@@ -122,10 +123,16 @@ class PGNParser:
         while game != None and self.size < self.max_size:
             res = game.headers["Result"]
 
+            """
             match res:
                 case "1-0": winner = chess.WHITE
                 case "0-1": winner = chess.BLACK
                 case _: winner = None
+            """
+
+            if res == "1-0": winner = chess.WHITE
+            elif res == "0-1": winner = chess.BLACK
+            else: winner = None
             
             if winner: 
                 self.size += len(tuple(game.mainline_moves())) # add number of moves of current game to total size of X
@@ -170,7 +177,7 @@ class PGNParser:
 
 
 if __name__ == "__main__": 
-    pgn_parser = PGNParser(max_size=1000000)
+    pgn_parser = PGNParser()
     pgn_parser.save_training_data(pgn_parser.X, pgn_parser.y)
 
 
