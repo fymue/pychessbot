@@ -5,11 +5,13 @@ import numpy as np
 from pathlib import Path
 
 class PGNParser:
-    def __init__(self, max_size=10000):
+    def __init__(self, auto=True, max_size=10000):
         self.max_size = max_size # maximum size of samples to be stored in X (training data)
-        self.data_path = str(Path(__file__).parents[1]) + "/data/" # path to data folder containing all games in pgn format
         self.size = 0 # will be set after parge_pgn() gets called in parse_pgns()
-        self.X, self.y = self.parse_pgns(self.data_path) # store every board state as well as the "goodness" of the state
+
+        if auto:
+            self.data_path = str(Path(__file__).parents[1]) + "/data/" # path to data folder containing all games in pgn format
+            self.X, self.y = self.parse_pgns(self.data_path) # store every board state as well as the "goodness" of the state
 
     def parse_pgns(self, pgn_dir):
             # store the board states and their associated "goodness" values
