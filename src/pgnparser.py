@@ -6,7 +6,7 @@ from pathlib import Path
 
 class PGNParser:
     def __init__(self, max_size=10000):
-        self.max_size = max_size # maximum size of X (training data)
+        self.max_size = max_size # maximum size of samples to be stored in X (training data)
         self.data_path = str(Path(__file__).parents[1]) + "/data/" # path to data folder containing all games in pgn format
         self.size = 0 # will be set after parge_pgn() gets called in parse_pgns()
         self.X, self.y = self.parse_pgns(self.data_path) # store every board state as well as the "goodness" of the state
@@ -96,7 +96,6 @@ class PGNParser:
                         # -> has to be "manually" executed outside of the loop
 
                         move += 2
-
                         game_board.push(moves_played[move])
 
                         # the last move of a checkmate game is always the winning move
@@ -115,32 +114,46 @@ class PGNParser:
         # and find the winner of every game in order
         # to assign a "goodness" value for every move
 
+        print(f"Reading games from PGN file '{pgn_file}' (this might take a few seconds)...")
         games = []
 
-        pgn = open(pgn_file)
-        game = chess.pgn.read_game(pgn)
+        try:
+            pgn = open(pgn_file)
+            game = chess.pgn.read_game(pgn) # read the first game
 
-        while game != None and self.size < self.max_size:
-            res = game.headers["Result"]
+            while game != None and self.size < self.max_size:
+                res = game.headers["Result"]
 
-            """
-            match res:
-                case "1-0": winner = chess.WHITE
-                case "0-1": winner = chess.BLACK
-                case _: winner = None
-            """
+                """
+                match res:
+                    case "1-0": winner = chess.WHITE
+                    case "0-1": winner = chess.BLACK
+                    case _: winner = None
+                """
 
-            if res == "1-0": winner = chess.WHITE
-            elif res == "0-1": winner = chess.BLACK
-            else: winner = None
-            
-            if winner: 
-                self.size += len(tuple(game.mainline_moves())) # add number of moves of current game to total size of X
-                games.append((game, winner))
+                if res == "1-0": winner = chess.WHITE
+                elif res == "0-1": winner = chess.BLACK
+                else: winner = None
+                
+                total_moves = len(tuple(game.mainline_moves())) # total moves of this game
 
-            game = chess.pgn.read_game(pgn)
+                if winner and total_moves >= 2: 
+                    # store the current game and winner 
+                    # (only if game ended in checkmate and game was "valid" 
+                    # ( -> min. 2 moves; sometimes PGN contains falsely formatted games))
 
-        pgn.close()
+                    self.size +=  total_moves # add number of moves of current game to total size of X
+                    games.append((game, winner))
+
+                game = chess.pgn.read_game(pgn) # read the next game
+
+            pgn.close()
+        
+        except Exception as e:
+            print(f"Some game(s) from {pgn_file} could not be read!")
+            print("There seems to be something wrong with the PGN format of the file.")
+            print("Consider removing it from the data folder.")
+            print(e)
 
         # only return games list if it contains at least 1 game (might not if self.max_size is already reached)
         return games if games else None
@@ -177,7 +190,7 @@ class PGNParser:
 
 
 if __name__ == "__main__": 
-    pgn_parser = PGNParser()
+    pgn_parser = PGNParser(max_size=1000000)
     pgn_parser.save_training_data(pgn_parser.X, pgn_parser.y)
 
 
