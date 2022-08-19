@@ -4,6 +4,7 @@ from pathlib import Path
 from tensorflow import keras
 from time import sleep
 from pgnparser import PGNParser
+import sunfish
 
 class Game:
     def __init__(self, model, bot_move_delay=0):
@@ -27,15 +28,17 @@ class Game:
         if model is None: model = self.model
 
         # get all legal moves from here (excluding moves that put the king in check)
-        legal_moves = tuple(board.pseudo_legal_moves)
+        legal_moves = tuple(board.legal_moves)
 
-        if not legal_moves: 
-            # if there are not moves that don't put the king in check, get those instead (game over)
-            legal_moves = tuple(board.pseudo_legal_moves)
-    
+        if not legal_moves:
+            # if no moves that don't put the king in check are possible,
+            # play one of those (means that the game is over)
+            pseudo_legal_moves = board.pseudo_legal_moves
+            legal_moves_uci = {move.uci() for move in legal_moves}
+            pseudo_legal_moves_uci = {move.uci for move in pseudo_legal_moves}
+            legal_moves = [chess.Move.from_uci(move) for move in legal_moves_uci ^ pseudo_legal_moves_uci]
+
         # calculate the board state tensor for every possible move
-
-        #possible_boards = np.empty((board.legal_moves.count(), 6, 8, 8))
         possible_boards = np.empty((len(legal_moves), 7, 8, 8))
 
         for i, move in enumerate(legal_moves):
@@ -185,8 +188,53 @@ class Game:
             move_c += 1
         
         self.get_game_result(self.board, move_c)
+    
+    def play_vs_sunfish(self, quiet=False):
+        # play against the sunfish chess engine
+        # (https://github.com/thomasahle/sunfish/)
+
+        #TODO implement pawn promotion, casting, en passant
+
+        self.board = chess.Board()
+        #self.board.turn = False # sunfish wants so start as black
+        sunfish_board = sunfish.Position(sunfish.initial, 0, (True,True), (True,True), 0, 0)
+        sunfish_searcher = sunfish.Searcher()
+
+        if not quiet:
+            print(self.board)
+            print()
+
+        move_c = 0
+
+        while not self.board.is_game_over() and move_c < 100:
+            # run the loop until the game is over (checkmate)
+
+            bot_move = self.predict_best_move(self.board)
+            bot_move_uci = bot_move.uci()
+
+            sleep(self.bot_move_delay)
+            print(f"[WHITE] Pychessbot's move: '{bot_move_uci}'\n")
+            self.execute_move(bot_move, quiet=quiet)
+
+            start_sq, end_sq = bot_move_uci[:2], bot_move_uci[2:] # start square and end square of last pychessbot move
+            bot_move_to_sunfish = (sunfish.parse(start_sq), sunfish.parse(end_sq)) # convert to sunfish's move format
+            sunfish_board = sunfish_board.move(bot_move_to_sunfish) # execute move on sunfish board
+
+            # let sunfish make its move
+            sunfish_move, sunfish_score = sunfish_searcher.search(sunfish_board, secs=1) # sunfish best move prediction
+            sunfish_board = sunfish_board.move(sunfish_move) # play predicted move on sunfish board
+
+            # adjust move to match turn (black) and convert sunfish move to python-chess move
+            sunfish_move_uci = sunfish.render(119-sunfish_move[0]) + sunfish.render(119-sunfish_move[1])
+            
+            print(f"[BLACK] Sunfish's move: '{sunfish_move_uci}'\n")
+            self.execute_move(chess.Move.from_uci(sunfish_move_uci), quiet=quiet) # play sunfish's move on main board
+
+            move_c += 1
+        
+        self.get_game_result(self.board, move_c)
 
 
 if __name__ == "__main__":
     game = Game("chess_model_v2")
-    game.play_vs_self()
+    game.play_vs_sunfish()
