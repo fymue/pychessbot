@@ -24,7 +24,7 @@ class PGNParser:
                     pgn = self.parse_pgn(pgn_dir + pgn_file)
                     if pgn: pgns.append(pgn)
 
-            X = np.empty((self.size, 6, 8, 8), dtype=np.int8)
+            X = np.empty((self.size, 7, 8, 8), dtype=np.int8)
             y = np.empty(self.size, dtype=np.uint8)
 
             i = 0 # counter for all board states added to X
@@ -57,7 +57,7 @@ class PGNParser:
 
                         game_board.push(moves_played[0]) # play the 1st move since the loop starts at index 1 instead of 0
 
-                        random_move = tuple(random_board.legal_moves)[np.random.randint(0, random_board.legal_moves.count())]
+                        random_move = tuple(random_board.pseudo_legal_moves)[np.random.randint(0, random_board.pseudo_legal_moves.count())]
                         random_board.push(random_move)
                         bad_board_state = self.convert_board_to_tensor(random_board, winner)
 
@@ -71,14 +71,16 @@ class PGNParser:
                         # (because all games are GrandMaster games and thus (early) moves are not necessarily bad)
 
                         # play the next move of the game and convert the resulting board state to a tensor
+                        
                         game_board.push(moves_played[move])
                         good_board_state = self.convert_board_to_tensor(game_board, winner)
 
                         # set the random board (for the random, "bad" moves) to the current state of the game board,
                         # execute a random "bad" move and convert the resulting board state to a tensor 
                         random_board.set_fen(game_board.fen())
-                        random_move = tuple(random_board.legal_moves)[np.random.randint(0, random_board.legal_moves.count())]
+                        random_move = tuple(random_board.pseudo_legal_moves)[np.random.randint(0, random_board.pseudo_legal_moves.count())]
                         random_board.push(random_move)
+
                         bad_board_state = self.convert_board_to_tensor(random_board, winner)
 
                         # play the actual next move in the game so the actual next move is correct
@@ -160,10 +162,11 @@ class PGNParser:
         # only return games list if it contains at least 1 game (might not if self.max_size is already reached)
         return games if games else None
     
+
     def convert_board_to_tensor(self, board, winner):
         # convert the current board state to a 6x8x8 tensor (1 8x8 board for every figure)
 
-        board_state = np.zeros((6, 8, 8), dtype=np.int8)
+        board_state = np.zeros((7, 8, 8), dtype=np.int8)
         piece_map = board.piece_map()
 
         white_val = 1 if winner == chess.WHITE else -1
@@ -180,8 +183,53 @@ class PGNParser:
             layer = layer_indices[curr_piece.lower()]
 
             board_state[layer, row, col] = white_val if curr_piece.isupper() else black_val
+        
+        board_state[6, :, :] = board.turn * 1 # last column represents who's turn it is
 
         return board_state
+    
+    def convert_board_to_tensor2(self, board, winner):
+        # different method of convert the current board state
+        # (taken from https://github.com/geohot/twitchchess/blob/master/state.py)
+
+        bstate = np.zeros(64, np.uint8)
+
+        figs = {"P": 1, "N": 2, "B": 3, "R": 4, "Q": 5, "K": 6,
+                "p": 9, "n":10, "b":11, "r":12, "q":13, "k": 14}
+
+        for i in range(64):
+            pp = board.piece_at(i)
+        if pp is not None:
+            bstate[i] = figs[pp.symbol()]
+
+        if board.has_queenside_castling_rights(chess.WHITE):
+            bstate[0] = 7
+        if board.has_kingside_castling_rights(chess.WHITE):
+            bstate[7] = 7
+        if board.has_queenside_castling_rights(chess.BLACK):
+            bstate[56] = 8+7
+        if board.has_kingside_castling_rights(chess.BLACK):
+            bstate[63] = 8+7
+
+        if board.ep_square is not None:
+            bstate[board.ep_square] = 8
+
+        bstate = bstate.reshape(8, 8)
+
+        # binary state
+        state = np.zeros((5, 8, 8), np.uint8)
+
+        # 0-3 columns to binary
+        state[0] = (bstate>>3)&1
+        state[1] = (bstate>>2)&1
+        state[2] = (bstate>>1)&1
+        state[3] = (bstate>>0)&1
+
+        # 4th column is who's turn it is
+        state[4] = (board.turn * 1)
+
+        # 257 bits according to readme
+        return state
 
     def save_training_data(self, X, y):
         # save the training data to a .npz file
@@ -189,11 +237,8 @@ class PGNParser:
 
         np.savez_compressed(f"{self.data_path}training_data_{self.max_size}", X=X, y=y)
 
-
+        
 
 if __name__ == "__main__": 
     pgn_parser = PGNParser(max_size=1000000)
     pgn_parser.save_training_data(pgn_parser.X, pgn_parser.y)
-
-
-    
