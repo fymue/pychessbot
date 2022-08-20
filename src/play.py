@@ -58,6 +58,14 @@ class Game:
     
     def execute_move(self, move, quiet=True):
         # execute a move and print the updated board
+        
+        turn = self.board.turn # whose turn is it?
+        is_pawn = self.board.piece_type_at(move.from_square) == chess.PAWN # is piece thats about to move a pawn?
+        to_square = move.to_square // 8 # which row (1-8) does the piece move to?
+
+        # check if pawn promotion is possible after move
+        if (turn == chess.WHITE and is_pawn and  to_square == 7) or (turn == chess.BLACK and is_pawn and to_square == 0):
+            move.promotion = chess.QUEEN
 
         self.board.push(move)
 
@@ -73,13 +81,17 @@ class Game:
         possible_moves = tuple(board.pseudo_legal_moves)
         return possible_moves[np.random.randint(0, len(possible_moves))]
     
-    def get_game_result(self, board, move_c):
+    def get_game_result(self, board):
         res = board.outcome()
 
+        winner = "White" if res.winner else "Black" # res.winner returns chess.WHITE or chess.BLACK; chess.WHITE == True
+
         if res:
-            print(f"Game over! The result of the game is: {res.result()} (Winner: {res.winner} in {move_c} moves)")
+            print(f"Game over! The result of the game is: {res.result()} (Winner: {winner} in {board.fullmove_number} moves)")
         else:
-            print("The game was stopped due to it probably never coming to an end (over 100 moves played).")
+            print("The game was stopped due to it probably never coming to an end (over 50 moves played).")
+
+        return
 
     def play_vs_player(self, quiet=False):
         # play a chess game against the bot
@@ -89,9 +101,7 @@ class Game:
             print(self.board)
             print()
 
-        move_c = 0
-
-        while not self.board.is_game_over() and move_c < 100:
+        while not self.board.is_game_over() and not self.board.is_fifty_moves():
             # run the loop until the game is over (checkmate)
             
             move = None
@@ -118,10 +128,10 @@ class Game:
             print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
 
             self.execute_move(bot_move, quiet=quiet)
-        
-            move_c += 1
 
-        self.get_game_result(self.board, move_c)
+        self.get_game_result(self.board)
+
+        return
 
     def play_vs_self(self, quiet=False):
         # let the bot play a game against itself
@@ -132,9 +142,7 @@ class Game:
             print(self.board)
             print()
 
-        move_c = 0
-
-        while not self.board.is_game_over() and move_c < 100:
+        while not self.board.is_game_over() and not self.board.is_fifty_moves():
             # run the loop until the game is over (checkmate)
             
             # ca. 80% of the time, play the best move; ca. 20% of the time, play a random (bad) move
@@ -148,9 +156,9 @@ class Game:
             print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
             self.execute_move(bot_move, quiet=quiet)
         
-            move_c += 1
-        
-        self.get_game_result(self.board, move_c)
+        self.get_game_result(self.board)
+
+        return
     
     def play_vs_model(self, opp_model, main_model=None, quiet=False):
         # let two models play against each other
@@ -168,9 +176,7 @@ class Game:
             print(self.board)
             print()
 
-        move_c = 0
-
-        while not self.board.is_game_over() and move_c < 100:
+        while not self.board.is_game_over() and not self.board.is_fifty_moves():
             # run the loop until the game is over (checkmate)
             
             if move_c == 0: bot_move = self.random_move(self.board)
@@ -185,18 +191,15 @@ class Game:
             print(f"[BLACK] Pychessbot's move (opp model): '{bot_move.uci()}'\n")
             self.execute_move(bot_move, quiet=quiet)
         
-            move_c += 1
-        
-        self.get_game_result(self.board, move_c)
+        self.get_game_result(self.board)
+
+        return
     
     def play_vs_sunfish(self, quiet=False):
         # play against the sunfish chess engine
         # (https://github.com/thomasahle/sunfish/)
 
-        #TODO implement pawn promotion, casting, en passant
-
         self.board = chess.Board()
-        #self.board.turn = False # sunfish wants so start as black
         sunfish_board = sunfish.Position(sunfish.initial, 0, (True,True), (True,True), 0, 0)
         sunfish_searcher = sunfish.Searcher()
 
@@ -206,10 +209,10 @@ class Game:
 
         move_c = 0
 
-        while not self.board.is_game_over() and move_c < 100:
+        while not self.board.is_game_over() and not self.board.is_fifty_moves():
             # run the loop until the game is over (checkmate)
 
-            bot_move = self.predict_best_move(self.board)
+            bot_move = self.predict_best_move(self.board) if self.board.fullmove_number > 1 else self.random_move(self.board)
             bot_move_uci = bot_move.uci()
 
             sleep(self.bot_move_delay)
@@ -229,12 +232,12 @@ class Game:
             
             print(f"[BLACK] Sunfish's move: '{sunfish_move_uci}'\n")
             self.execute_move(chess.Move.from_uci(sunfish_move_uci), quiet=quiet) # play sunfish's move on main board
-
-            move_c += 1
         
-        self.get_game_result(self.board, move_c)
+        self.get_game_result(self.board)
+        
+        return
 
 
 if __name__ == "__main__":
     game = Game("chess_model_v2")
-    game.play_vs_sunfish()
+    game.play_vs_sunfish(quiet=False)
