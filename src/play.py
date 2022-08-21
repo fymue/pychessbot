@@ -239,5 +239,5 @@ class Game:
 
 
 if __name__ == "__main__":
-    game = Game("chess_model_v2")
+    game = Game("chess_model")
     game.play_vs_sunfish(quiet=False)

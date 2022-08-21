@@ -111,7 +111,7 @@ class PGNParser:
 
             print(f"[File {fc}/{len(pgns)}] Finished! Parsed {gc}/{len(pgn)} games resulting in checkmate ({i} board state samples generated)\n")
 
-            return X, y
+            return X, y        
 
     def parse_pgn(self, pgn_file):
         # read a pgn file containing multiple games
@@ -151,6 +151,7 @@ class PGNParser:
 
                 game = chess.pgn.read_game(pgn) # read the next game
 
+            
             pgn.close()
         
         except Exception as e:
@@ -184,52 +185,28 @@ class PGNParser:
 
             board_state[layer, row, col] = white_val if curr_piece.isupper() else black_val
         
-        board_state[6, :, :] = board.turn * 1 # last column represents who's turn it is
+        board_state[6, :, :] = board.turn * 1.0 # last dimension represents who's turn it is
 
         return board_state
-    
+
     def convert_board_to_tensor2(self, board, winner):
-        # different method of convert the current board state
-        # (taken from https://github.com/geohot/twitchchess/blob/master/state.py)
 
-        bstate = np.zeros(64, np.uint8)
+        board_state = np.zeros((8, 8), dtype=np.int8)
+        piece_map = board.piece_map()
 
-        figs = {"P": 1, "N": 2, "B": 3, "R": 4, "Q": 5, "K": 6,
-                "p": 9, "n":10, "b":11, "r":12, "q":13, "k": 14}
+        white_val = 1 if winner == chess.WHITE else -1
+        black_val = -white_val
 
-        for i in range(64):
-            pp = board.piece_at(i)
-        if pp is not None:
-            bstate[i] = figs[pp.symbol()]
+        for pos in piece_map:
+            curr_piece = piece_map[pos].symbol()
 
-        if board.has_queenside_castling_rights(chess.WHITE):
-            bstate[0] = 7
-        if board.has_kingside_castling_rights(chess.WHITE):
-            bstate[7] = 7
-        if board.has_queenside_castling_rights(chess.BLACK):
-            bstate[56] = 8+7
-        if board.has_kingside_castling_rights(chess.BLACK):
-            bstate[63] = 8+7
+            # calculate the correct index for the current tensor value
+            row = np.abs(pos // 8 - 7)
+            col = pos % 8
 
-        if board.ep_square is not None:
-            bstate[board.ep_square] = 8
-
-        bstate = bstate.reshape(8, 8)
-
-        # binary state
-        state = np.zeros((5, 8, 8), np.uint8)
-
-        # 0-3 columns to binary
-        state[0] = (bstate>>3)&1
-        state[1] = (bstate>>2)&1
-        state[2] = (bstate>>1)&1
-        state[3] = (bstate>>0)&1
-
-        # 4th column is who's turn it is
-        state[4] = (board.turn * 1)
-
-        # 257 bits according to readme
-        return state
+            board_state[row, col] = white_val if curr_piece.isupper() else black_val
+        
+        return board_state
 
     def save_training_data(self, X, y):
         # save the training data to a .npz file
@@ -240,5 +217,5 @@ class PGNParser:
         
 
 if __name__ == "__main__": 
-    pgn_parser = PGNParser(max_size=1000000)
+    pgn_parser = PGNParser(max_size=10000)
     pgn_parser.save_training_data(pgn_parser.X, pgn_parser.y)
