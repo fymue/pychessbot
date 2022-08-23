@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
+
 import chess
 import numpy as np
 from pathlib import Path
 from tensorflow import keras
 from time import sleep
 from pgnparser import PGNParser
+from model import Model
 import sunfish
 
 class Game:
@@ -39,7 +42,7 @@ class Game:
             legal_moves = [chess.Move.from_uci(move) for move in legal_moves_uci ^ pseudo_legal_moves_uci]
 
         # calculate the board state tensor for every possible move
-        possible_boards = np.empty((len(legal_moves), 7, 8, 8))
+        possible_boards = np.empty((len(legal_moves), 8, 8, 6))
 
         for i, move in enumerate(legal_moves):
             board.push(move)
@@ -179,7 +182,7 @@ class Game:
         while not self.board.is_game_over() and not self.board.is_fifty_moves():
             # run the loop until the game is over (checkmate)
             
-            if move_c == 0: bot_move = self.random_move(self.board)
+            if self.board.fullmove_number == 1: bot_move = self.random_move(self.board)
             else: bot_move = self.predict_best_move(self.board, model=main_model)
 
             sleep(self.bot_move_delay)
@@ -240,4 +243,4 @@ class Game:
 
 if __name__ == "__main__":
     game = Game("chess_model")
-    game.play_vs_sunfish(quiet=False)
+    game.play_vs_player(quiet=False)

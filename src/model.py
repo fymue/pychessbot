@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import tensorflow as tf
 import os
 import numpy as np
@@ -16,6 +18,7 @@ class Model:
         self.model_path = self.parent_path + "/model/"
 
         self.X_train, self.y_train, self.X_test, self.y_test = self.load_data(self.data_path)
+        self.input_dims = self.X_train.shape[1:]
         self.model = self.create_model()
     
     def load_data(self, data_path, test_size=0.2):
@@ -41,17 +44,19 @@ class Model:
 
         model = tf.keras.models.Sequential()
 
-        model.add(layers.Conv2D(32, (3, 3), activation="relu", padding="same", input_shape=self.X_train.shape[1:]))
-        model.add(layers.MaxPooling2D((2, 2)))
+        model.add(layers.Conv2D(16, (3, 3), activation="relu", padding="same", input_shape=self.input_dims))
+        model.add(layers.MaxPooling2D((2,2)))
+        model.add(layers.Conv2D(32, (3, 3), activation="relu", padding="same"))
+        model.add(layers.MaxPooling2D((2,2)))
         model.add(layers.Conv2D(64, (3, 3), activation="relu", padding="same"))
-        model.add(layers.MaxPooling2D((2, 2)))
+        model.add(layers.MaxPooling2D((2,2)))
 
         model.add(layers.Flatten())
         model.add(layers.Dense(64, activation="relu"))
-        model.add(layers.Dense(1))
+        model.add(layers.Dense(1, activation="tanh"))
 
 
-        model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+        model.compile(optimizer="adam", loss="mean_squared_error", metrics=["accuracy"])
 
         return model
     
@@ -61,7 +66,7 @@ class Model:
         if not X_train: X_train = self.X_train
         if not y_train: y_train = self.y_train
 
-        self.model.fit(X_train, y_train, epochs=2, batch_size=128, validation_split=0.2, shuffle=True, verbose=2)
+        self.model.fit(X_train, y_train, epochs=10, batch_size=64, validation_split=0.2, shuffle=True, verbose=2)
     
     def evaluate(self, X_test=None, y_test=None):
         # test the accuracy of the trained neural network

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import chess
 import chess.pgn
 import os
@@ -24,7 +26,7 @@ class PGNParser:
                     pgn = self.parse_pgn(pgn_dir + pgn_file)
                     if pgn: pgns.append(pgn)
 
-            X = np.empty((self.size, 7, 8, 8), dtype=np.int8)
+            X = np.empty((self.size, 8, 8, 6), dtype=np.int8)
             y = np.empty(self.size, dtype=np.uint8)
 
             i = 0 # counter for all board states added to X
@@ -167,7 +169,7 @@ class PGNParser:
     def convert_board_to_tensor(self, board, winner):
         # convert the current board state to a 6x8x8 tensor (1 8x8 board for every figure)
 
-        board_state = np.zeros((7, 8, 8), dtype=np.int8)
+        board_state = np.zeros((8, 8, 6), dtype=np.int8)
         piece_map = board.piece_map()
 
         white_val = 1 if winner == chess.WHITE else -1
@@ -183,29 +185,10 @@ class PGNParser:
             col = pos % 8
             layer = layer_indices[curr_piece.lower()]
 
-            board_state[layer, row, col] = white_val if curr_piece.isupper() else black_val
+            board_state[row, col, layer] = white_val if curr_piece.isupper() else black_val
         
-        board_state[6, :, :] = board.turn * 1.0 # last dimension represents who's turn it is
+        #board_state[:, :, 6] = board.turn * 1.0 # last dimension represents who's turn it is
 
-        return board_state
-
-    def convert_board_to_tensor2(self, board, winner):
-
-        board_state = np.zeros((8, 8), dtype=np.int8)
-        piece_map = board.piece_map()
-
-        white_val = 1 if winner == chess.WHITE else -1
-        black_val = -white_val
-
-        for pos in piece_map:
-            curr_piece = piece_map[pos].symbol()
-
-            # calculate the correct index for the current tensor value
-            row = np.abs(pos // 8 - 7)
-            col = pos % 8
-
-            board_state[row, col] = white_val if curr_piece.isupper() else black_val
-        
         return board_state
 
     def save_training_data(self, X, y):
@@ -217,5 +200,5 @@ class PGNParser:
         
 
 if __name__ == "__main__": 
-    pgn_parser = PGNParser(max_size=10000)
+    pgn_parser = PGNParser(max_size=1000000)
     pgn_parser.save_training_data(pgn_parser.X, pgn_parser.y)
