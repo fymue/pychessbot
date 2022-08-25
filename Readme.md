@@ -37,3 +37,10 @@ If you prefer to install the program from source instead, after cloning the repo
 pip install -r requirements.txt
 ```
 After this you can run the program directly using one of the existing models found under [model](https://github.com/fymue/pychessbot/tree/main/model).
+
+## Usage
+
+The program can either be run from the command line or as a web application in your browser (on localhost:5000) by executing the command
+```
+python3 play.py
+```

@@ -1,28 +1,36 @@
 #!/usr/bin/env python3
 
-import chess
+import chess, chess.svg, flask, sunfish, argparse
 import numpy as np
 from pathlib import Path
 from tensorflow import keras
 from time import sleep
 from pgnparser import PGNParser
 from model import Model
-import sunfish
+from sys import argv
+
+app = flask.Flask(__name__)
 
 class Game:
     def __init__(self, model, bot_move_delay=0):
         # load a model stored in model/, create an empty board to play on
 
-        self.model_path = str(Path(__file__).parents[1]) + "/model/"
+        self.parent_path = str(Path(__file__).parents[1])
+        self.model_path =  self.parent_path + "/model/"
         self.bot_move_delay = bot_move_delay
-        self.model = self.initialize_model(self.model_path + model)
         self.board = None
+        self.update_svg_board(chess.BaseBoard()) # initialize/update the svg game board as empty
+        self.model = self.initialize_model(self.model_path + model)
         self.parser = PGNParser(auto=False)
 
     def initialize_model(self, model_path):
         # load a previously trained model
 
         return keras.models.load_model(model_path)
+
+    def update_svg_board(self, board=None):
+        if board is None: board = self.board
+        with open(self.parent_path + "/src/static/board.svg", "w") as fout: fout.write(chess.svg.board(board))
 
     def predict_best_move(self, board, model=None):
         # predict the best move from all possible moves
@@ -75,6 +83,9 @@ class Game:
         if not quiet:
             print(self.board)
             print()
+        
+        self.update_svg_board()
+
     
     def random_move(self, board):
         # play a random move
@@ -87,7 +98,12 @@ class Game:
     def get_game_result(self, board):
         res = board.outcome()
 
-        winner = "White" if res.winner else "Black" # res.winner returns chess.WHITE or chess.BLACK; chess.WHITE == True
+        if res.winner is None:
+            winner = "Draw"
+        elif res.winner == chess.WHITE:
+            winner = "White"
+        else:
+            winner = "Black"
 
         if res:
             print(f"Game over! The result of the game is: {res.result()} (Winner: {winner} in {board.fullmove_number} moves)")
@@ -171,7 +187,7 @@ class Game:
         if main_model is None: 
             main_model = self.model
         else:
-            main_model = self.initialize_model(self.modelpath + main_model)
+            main_model = self.initialize_model(self.model_path + main_model)
 
         opp_model = self.initialize_model(self.model_path + opp_model)
 
@@ -240,7 +256,37 @@ class Game:
         
         return
 
+@app.route("/")
+def init_page(): return flask.render_template("index.html")
 
 if __name__ == "__main__":
     game = Game("chess_model")
-    game.play_vs_player(quiet=False)
+    
+    # parse the command line arguments
+    # (if no argument -> launch GUI as webpage on localhost:5000)
+    # (else: play/watch a game on the command line)
+
+    passed_mode_args = len([True for el in argv if el[0] == "-"])
+
+    if len(argv) == 1: 
+        app.run()
+    elif passed_mode_args > 1:
+        print(f"Please provide at most 1 game mode option (found {passed_mode_args})!")
+    else:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--player", "-p", action="store_true", help="Start a new game between PyChessBot vs. a player (you)")
+        parser.add_argument("--self", "-s", action="store_true", help="Let PyChessBot play a game against itself")
+        parser.add_argument("--sunfish", "-sf", action="store_true", help="Let PyChessBot play a game against the Sunfish engine")
+        parser.add_argument("--model", "-m", nargs=2, metavar=("model1", "model2"), type=str, help="Let two models from pychessbot/model/ play against each other")
+
+        args = parser.parse_args()
+    
+        if args.player: game.play_vs_player()
+        elif args.self: game.play_vs_self()
+        elif args.model: game.play_vs_model(args.model[1], args.model[0])
+        elif args.sunfish: game.play_vs_sunfish()
+    
+    game.update_svg_board(chess.GameBoard()) # reset the game board svg to an empty board
+
+        
+
