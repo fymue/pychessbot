@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import chess, chess.svg, flask, sunfish, argparse
+import chess, chess.svg, flask, sunfish, argparse, os
 import numpy as np
 from pathlib import Path
 from tensorflow import keras
@@ -10,16 +10,17 @@ from model import Model
 from sys import argv
 
 app = flask.Flask(__name__)
+path = str(Path(__file__).parents[1])
 
 class Game:
     def __init__(self, model, bot_move_delay=0):
         # load a model stored in model/, create an empty board to play on
 
-        self.parent_path = str(Path(__file__).parents[1])
-        self.model_path =  self.parent_path + "/model/"
+        print(os.listdir())
+        self.model_path =  path + "/model/"
         self.bot_move_delay = bot_move_delay
         self.board = None
-        self.update_svg_board(chess.BaseBoard()) # initialize/update the svg game board as empty
+        self.update_svg_board(None, "src/static/board.svg") # initialize/update the svg game board as empty
         self.model = self.initialize_model(self.model_path + model)
         self.parser = PGNParser(auto=False)
 
@@ -28,9 +29,9 @@ class Game:
 
         return keras.models.load_model(model_path)
 
-    def update_svg_board(self, board=None):
-        if board is None: board = self.board
-        with open(self.parent_path + "/src/static/board.svg", "w") as fout: fout.write(chess.svg.board(board))
+    @staticmethod
+    def update_svg_board(board, path):
+        with open(path, "w") as fout: fout.write(chess.svg.board(board))
 
     def predict_best_move(self, board, model=None):
         # predict the best move from all possible moves
@@ -84,7 +85,7 @@ class Game:
             print(self.board)
             print()
         
-        self.update_svg_board()
+        self.update_svg_board(self.board, path + "/src/static/board.svg")
 
     
     def random_move(self, board):
@@ -259,8 +260,22 @@ class Game:
 @app.route("/")
 def init_page(): return flask.render_template("index.html")
 
+@app.route("/", methods=["GET", "POST"])
+def start_game():
+    select = str(flask.request.form.get("gamemode"))
+
+    game = Game("chess_model", bot_move_delay=1)
+
+    if select == "sunfish": game.play_vs_sunfish(quiet=True)
+    elif select == "self": game.play_vs_self(quiet=True)
+    elif select == "model": game.play_vs_model(quiet=True)
+    else: game.play_vs_self(quiet=True)
+
+    return "OK"
+    
+
+
 if __name__ == "__main__":
-    game = Game("chess_model")
     
     # parse the command line arguments
     # (if no argument -> launch GUI as webpage on localhost:5000)
@@ -280,13 +295,15 @@ if __name__ == "__main__":
         parser.add_argument("--model", "-m", nargs=2, metavar=("model1", "model2"), type=str, help="Let two models from pychessbot/model/ play against each other")
 
         args = parser.parse_args()
-    
+
+        game = Game("chess_model")
+
         if args.player: game.play_vs_player()
         elif args.self: game.play_vs_self()
         elif args.model: game.play_vs_model(args.model[1], args.model[0])
         elif args.sunfish: game.play_vs_sunfish()
-    
-    game.update_svg_board(chess.GameBoard()) # reset the game board svg to an empty board
+
+    Game.update_svg_board(None, path + "/src/static/board.svg")
 
         
 

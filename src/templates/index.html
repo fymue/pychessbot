@@ -1,18 +1,45 @@
 <!DOCTYPE html>
 <html>
     <title>pychessbot</title>
+    <link rel="stylesheet" href="../static/styles/stylesheet.css">
+    <iframe name="hiddenFrame" width="0" height="0" style="display: none;"></iframe>
+
     <body>
         <h1>PyChessBot</h1>
         <label for="gamemode">Select game mode: PyChessBot vs. </label>
-        <select name="gamemode" id="gamemode">
-            <option value="player">You</option>
-            <option value="self">Itself</option>
-            <option value="model">Different Model</option>
-            <option value="sunfish">Sunfish Engine</option>
-        </select>
-        <br></br>
-        <input type="submit" value="Start game">
-        <br></br>
-        <object data="static/board.svg", width="400" height="400"></object>
+
+        <form method="POST" id="gameMode" target="hiddenFrame">
+            <select name="gamemode" id="gamemode">
+                <option value="player">You</option>
+                <option value="self">Itself</option>
+                <option value="model">Different Model</option>
+                <option value="sunfish">Sunfish Engine</option>
+            </select>
+            <input type="submit" id="startGame" value="Start Game">
+        </form>
+
+        <button id="newGame" disabled>New Game</button>
+        <br>
+        
+        <form>
+            <label for="nextMove">Your move:</label>
+            <input type="text" id="nextMove" name="nextMove">
+            <button style="margin-left: 15px;" type="submit">Play move</button>
+        </form>
+        <br>
+
+        <div style="float: left">
+            <img src="../static/board.svg" id="boardsvg" alt="img">
+        </div>
+        <label style="margin-left: 10px; float: left;">Move history</label>
+        <br>
+        <div>
+            <textarea style="margin-left: 10px; float: left;" name="moveHistory" id="moveHistory" cols="20" rows="20"></textarea>
+        </div>
     </body>
+
+    <script type="text/javascript">
+        const img = document.querySelector("img");
+        setInterval(function(){ img.src = "../static/board.svg?" + Math.random();}, 1000)
+    </script>
 </html>

@@ -1,0 +1,13 @@
+#startGame
+{
+    margin: 15px;         
+}
+#gameMode
+{
+    display: inline-block;
+}
+#boardsvg
+{
+    height: 400px;
+    width: 400px;
+}
