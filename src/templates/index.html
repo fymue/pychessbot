@@ -2,13 +2,12 @@
 <html>
     <title>pychessbot</title>
     <link rel="stylesheet" href="../static/styles/stylesheet.css">
-    <iframe name="hiddenFrame" width="0" height="0" style="display: none;"></iframe>
 
     <body>
         <h1>PyChessBot</h1>
         <label for="gamemode">Select game mode: PyChessBot vs. </label>
 
-        <form method="POST" id="gameMode" target="hiddenFrame" onsubmit="startGame.disabled = true; newGame.disabled = false; return true;">
+        <form method="POST" id="gameMode" target="moveHistory" onsubmit="startGame.disabled = true; newGame.disabled = false; return true;">
             <select name="gamemode" id="gamemode">
                 <option value="self">Itself</option>
                 <option value="player">You</option>
@@ -20,7 +19,7 @@
         <button id="newGame" disabled>New Game</button>
         <br>
         
-        <form method="POST" id="playMove" target="hiddenFrame">
+        <form method="POST" id="playMove" target="moveHistory">
             <label for="nextMove">Your move:</label>
             <input type="text" id="nextMove" name="nextMove" placeholder="format like 'd2d4'">
             <input style="margin-left: 15px;" type="submit" value="Play move" onclick="document.getElementById('playMove').submit(); document.getElementById('nextMove').value = ''; return false;">
@@ -30,11 +29,12 @@
         <div style="float: left">
             <img src="../static/board.svg" id="boardsvg" alt="img">
         </div>
+
         <label style="margin-left: 10px; float: left;">Move history</label>
         <br>
-        <div>
-            <textarea style="margin-left: 10px; float: left;" name="moveHistory" id="moveHistory" cols="20" rows="20"></textarea>
-        </div>
+        <iframe style="margin-left: 10px; float: left;" name="moveHistory" id="moveHistory" height="350" width="300"></iframe>
+
+
     </body>
 
     <script type="text/javascript">

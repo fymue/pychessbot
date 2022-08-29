@@ -10,8 +10,9 @@ from model import Model
 from sys import argv
 
 board = None
-move = None
 game = None
+
+move_history = ""
 
 app = flask.Flask(__name__)
 path = str(Path(__file__).parents[1])
@@ -265,8 +266,7 @@ def init_page(): return flask.render_template("index.html")
 
 @app.route("/", methods=["GET", "POST"])
 def start_game():
-    global game, board, move, model
-    print("ENTERED START_GAME")
+    global game, board, move_history
 
     select = str(flask.request.form.get("gamemode"))
 
@@ -282,11 +282,9 @@ def start_game():
         board = chess.Board()
         Game.update_svg_board(board, path + "/src/static/board.svg")
     else:
-        print("ENTERED PLAY MOVE")
         move = None
 
         inp = str(flask.request.form.get("nextMove"))
-        print(inp)
 
         while move is None:
             try:
@@ -294,12 +292,15 @@ def start_game():
                 move = chess.Move.from_uci(inp)
 
                 if not board.is_legal(move): 
-                    flask.flash(f"\nThe move '{inp}' is not legal! Please try again...\n")
                     move = None
+                    return f"The move '{inp}' is not legal! Please try again..."
+
             except Exception:
-                flask.flash("\nInvalid move format (must be like 'b2b4')! Please try again...\n")
+                return "Invalid move format (must be like 'b2b4')! Please try again..."
 
         Game.execute_move(move, board, quiet=True)
+
+        move_history += move.uci() + "<br>"
 
         if board.is_game_over() or board.is_fifty_moves(): Game.get_game_result(board)
 
@@ -310,43 +311,11 @@ def start_game():
 
         Game.execute_move(bot_move, board, quiet=True)
 
+        move_history += bot_move.uci() + "<br>"
+
         if board.is_game_over() or board.is_fifty_moves(): Game.get_game_result(board)
-
-    return "OK"
-
-"""
-@app.route("/", methods=["POST"])
-def play_move_of_player():
-    global board, move
-
-    print("ENTERED PLAY MOVE")
-    move = None
-
-    inp = str(flask.request.form.get("nextMove"))
-    print(inp)
-
-    while move is None:
-        try:
-            # parse the user's move
-            move = chess.Move.from_uci(inp)
-
-            if not board.is_legal(move): 
-                flask.flash(f"\nThe move '{inp}' is not legal! Please try again...\n")
-                move = None
-        except Exception:
-            flask.flash("\nInvalid move format (must be like 'b2b4')! Please try again...\n")
-
-    Game.execute_move(move, board, quiet=True)
-
-    bot_move = Game.predict_best_move(board)
-
-    sleep(1)
-    print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
-
-    Game.execute_move(bot_move, board, quiet=True)
         
-    return "OK"
-"""
+    return move_history
 
 if __name__ == "__main__":
     
@@ -357,7 +326,6 @@ if __name__ == "__main__":
     passed_mode_args = len([True for el in argv if el[0] == "-"])
 
     if len(argv) == 1: 
-        app.secret_key = "143523539539943"
         app.run()
     elif passed_mode_args > 1:
         print(f"Please provide at most 1 game mode option (found {passed_mode_args})!")
