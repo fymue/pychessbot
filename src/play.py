@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import chess, chess.svg, flask, sunfish, argparse, os
+import chess, chess.svg, flask, sunfish, argparse
 import numpy as np
 from pathlib import Path
 from tensorflow import keras
@@ -9,6 +9,10 @@ from pgnparser import PGNParser
 from model import Model
 from sys import argv
 
+board = None
+move = None
+game = None
+
 app = flask.Flask(__name__)
 path = str(Path(__file__).parents[1])
 
@@ -16,13 +20,11 @@ class Game:
     def __init__(self, model, bot_move_delay=0):
         # load a model stored in model/, create an empty board to play on
 
-        print(os.listdir())
         self.model_path =  path + "/model/"
         self.bot_move_delay = bot_move_delay
         self.board = None
         self.update_svg_board(None, "src/static/board.svg") # initialize/update the svg game board as empty
         self.model = self.initialize_model(self.model_path + model)
-        self.parser = PGNParser(auto=False)
 
     def initialize_model(self, model_path):
         # load a previously trained model
@@ -33,11 +35,10 @@ class Game:
     def update_svg_board(board, path):
         with open(path, "w") as fout: fout.write(chess.svg.board(board))
 
-    def predict_best_move(self, board, model=None):
+    @staticmethod
+    def predict_best_move(board, model):
         # predict the best move from all possible moves
         # based on the current board state
-
-        if model is None: model = self.model
 
         # get all legal moves from here (excluding moves that put the king in check)
         legal_moves = tuple(board.legal_moves)
@@ -55,7 +56,7 @@ class Game:
 
         for i, move in enumerate(legal_moves):
             board.push(move)
-            possible_boards[i] = self.parser.convert_board_to_tensor(board, chess.BLACK)
+            possible_boards[i] = PGNParser.convert_board_to_tensor(board, chess.BLACK)
             board.pop()
         
 
@@ -67,25 +68,26 @@ class Game:
         val_of_best_move = vals_of_boards[best_move_i]
         
         return best_move
-    
-    def execute_move(self, move, quiet=True):
+
+    @staticmethod
+    def execute_move(move, board, quiet=True):
         # execute a move and print the updated board
         
-        turn = self.board.turn # whose turn is it?
-        is_pawn = self.board.piece_type_at(move.from_square) == chess.PAWN # is piece thats about to move a pawn?
+        turn = board.turn # whose turn is it?
+        is_pawn = board.piece_type_at(move.from_square) == chess.PAWN # is piece thats about to move a pawn?
         to_square = move.to_square // 8 # which row (1-8) does the piece move to?
 
         # check if pawn promotion is possible after move
         if (turn == chess.WHITE and is_pawn and  to_square == 7) or (turn == chess.BLACK and is_pawn and to_square == 0):
             move.promotion = chess.QUEEN
 
-        self.board.push(move)
+        board.push(move)
 
         if not quiet:
-            print(self.board)
+            print(board)
             print()
         
-        self.update_svg_board(self.board, path + "/src/static/board.svg")
+        Game.update_svg_board(board, path + "/src/static/board.svg")
 
     
     def random_move(self, board):
@@ -96,7 +98,8 @@ class Game:
         possible_moves = tuple(board.pseudo_legal_moves)
         return possible_moves[np.random.randint(0, len(possible_moves))]
     
-    def get_game_result(self, board):
+    @staticmethod
+    def get_game_result(board):
         res = board.outcome()
 
         if res.winner is None:
@@ -139,15 +142,15 @@ class Game:
                 except Exception:
                     print("\nInvalid move format (must be like 'b2b4')! Please try again...\n")
             
-            self.execute_move(move, quiet=quiet)
+            self.execute_move(move, self.board, quiet=quiet)
 
             # let the model predict the best move
-            bot_move = self.predict_best_move(self.board)
+            bot_move = self.predict_best_move(self.board, self.model)
 
             sleep(self.bot_move_delay)
             print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
 
-            self.execute_move(bot_move, quiet=quiet)
+            self.execute_move(bot_move, self.board, quiet=quiet)
 
         self.get_game_result(self.board)
 
@@ -166,15 +169,15 @@ class Game:
             # run the loop until the game is over (checkmate)
             
             # ca. 80% of the time, play the best move; ca. 20% of the time, play a random (bad) move
-            bot_move = self.random_move(self.board) if np.random.random() <= 0.2 else self.predict_best_move(self.board)
+            bot_move = self.random_move(self.board) if np.random.random() <= 0.2 else self.predict_best_move(self.board, self.model)
             sleep(self.bot_move_delay)
             print(f"[WHITE] Pychessbot's move: '{bot_move.uci()}'\n")
-            self.execute_move(bot_move, quiet=quiet)
+            self.execute_move(bot_move, self.board, quiet=quiet)
 
-            bot_move = self.random_move(self.board) if np.random.random() <= 0.2 else self.predict_best_move(self.board)
+            bot_move = self.random_move(self.board) if np.random.random() <= 0.2 else self.predict_best_move(self.board, self.model)
             sleep(self.bot_move_delay)
             print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
-            self.execute_move(bot_move, quiet=quiet)
+            self.execute_move(bot_move, self.board, quiet=quiet)
         
         self.get_game_result(self.board)
 
@@ -204,12 +207,12 @@ class Game:
 
             sleep(self.bot_move_delay)
             print(f"[WHITE] Pychessbot's move (main model): '{bot_move.uci()}'\n")
-            self.execute_move(bot_move, quiet=quiet)
+            self.execute_move(bot_move, self.board, quiet=quiet)
 
             bot_move = self.predict_best_move(self.board, model=opp_model)
             sleep(self.bot_move_delay)
             print(f"[BLACK] Pychessbot's move (opp model): '{bot_move.uci()}'\n")
-            self.execute_move(bot_move, quiet=quiet)
+            self.execute_move(bot_move, self.board, quiet=quiet)
         
         self.get_game_result(self.board)
 
@@ -232,12 +235,12 @@ class Game:
         while not self.board.is_game_over() and not self.board.is_fifty_moves():
             # run the loop until the game is over (checkmate)
 
-            bot_move = self.predict_best_move(self.board) if self.board.fullmove_number > 1 else self.random_move(self.board)
+            bot_move = self.predict_best_move(self.board, self.model) if self.board.fullmove_number > 1 else self.random_move(self.board)
             bot_move_uci = bot_move.uci()
 
             sleep(self.bot_move_delay)
             print(f"[WHITE] Pychessbot's move: '{bot_move_uci}'\n")
-            self.execute_move(bot_move, quiet=quiet)
+            self.execute_move(bot_move, self.board, quiet=quiet)
 
             start_sq, end_sq = bot_move_uci[:2], bot_move_uci[2:] # start square and end square of last pychessbot move
             bot_move_to_sunfish = (sunfish.parse(start_sq), sunfish.parse(end_sq)) # convert to sunfish's move format
@@ -251,7 +254,7 @@ class Game:
             sunfish_move_uci = sunfish.render(119-sunfish_move[0]) + sunfish.render(119-sunfish_move[1])
             
             print(f"[BLACK] Sunfish's move: '{sunfish_move_uci}'\n")
-            self.execute_move(chess.Move.from_uci(sunfish_move_uci), quiet=quiet) # play sunfish's move on main board
+            self.execute_move(chess.Move.from_uci(sunfish_move_uci), self.board, quiet=quiet) # play sunfish's move on main board
         
         self.get_game_result(self.board)
         
@@ -262,18 +265,88 @@ def init_page(): return flask.render_template("index.html")
 
 @app.route("/", methods=["GET", "POST"])
 def start_game():
+    global game, board, move, model
+    print("ENTERED START_GAME")
+
     select = str(flask.request.form.get("gamemode"))
 
-    game = Game("chess_model", bot_move_delay=1)
+    if not game and select == "sunfish": 
+        game = Game("chess_model", bot_move_delay=1)
+        game.play_vs_sunfish(quiet=True)
+    elif not game and select == "self": 
+        game = Game("chess_model", bot_move_delay=1)
+        game.play_vs_self(quiet=True)
+    elif not game and select == "player":
+        # start a game between a (human) player and PyChessBot
+        game = Game("chess_model", bot_move_delay=1)
+        board = chess.Board()
+        Game.update_svg_board(board, path + "/src/static/board.svg")
+    else:
+        print("ENTERED PLAY MOVE")
+        move = None
 
-    if select == "sunfish": game.play_vs_sunfish(quiet=True)
-    elif select == "self": game.play_vs_self(quiet=True)
-    elif select == "model": game.play_vs_model(quiet=True)
-    else: game.play_vs_self(quiet=True)
+        inp = str(flask.request.form.get("nextMove"))
+        print(inp)
+
+        while move is None:
+            try:
+                # parse the user's move
+                move = chess.Move.from_uci(inp)
+
+                if not board.is_legal(move): 
+                    flask.flash(f"\nThe move '{inp}' is not legal! Please try again...\n")
+                    move = None
+            except Exception:
+                flask.flash("\nInvalid move format (must be like 'b2b4')! Please try again...\n")
+
+        Game.execute_move(move, board, quiet=True)
+
+        if board.is_game_over() or board.is_fifty_moves(): Game.get_game_result(board)
+
+        bot_move = Game.predict_best_move(board, game.model)
+
+        sleep(1)
+        print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
+
+        Game.execute_move(bot_move, board, quiet=True)
+
+        if board.is_game_over() or board.is_fifty_moves(): Game.get_game_result(board)
 
     return "OK"
-    
 
+"""
+@app.route("/", methods=["POST"])
+def play_move_of_player():
+    global board, move
+
+    print("ENTERED PLAY MOVE")
+    move = None
+
+    inp = str(flask.request.form.get("nextMove"))
+    print(inp)
+
+    while move is None:
+        try:
+            # parse the user's move
+            move = chess.Move.from_uci(inp)
+
+            if not board.is_legal(move): 
+                flask.flash(f"\nThe move '{inp}' is not legal! Please try again...\n")
+                move = None
+        except Exception:
+            flask.flash("\nInvalid move format (must be like 'b2b4')! Please try again...\n")
+
+    Game.execute_move(move, board, quiet=True)
+
+    bot_move = Game.predict_best_move(board)
+
+    sleep(1)
+    print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
+
+    Game.execute_move(bot_move, board, quiet=True)
+        
+    return "OK"
+"""
 
 if __name__ == "__main__":
     
@@ -284,6 +357,7 @@ if __name__ == "__main__":
     passed_mode_args = len([True for el in argv if el[0] == "-"])
 
     if len(argv) == 1: 
+        app.secret_key = "143523539539943"
         app.run()
     elif passed_mode_args > 1:
         print(f"Please provide at most 1 game mode option (found {passed_mode_args})!")

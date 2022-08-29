@@ -165,8 +165,8 @@ class PGNParser:
         # only return games list if it contains at least 1 game (might not if self.max_size is already reached)
         return games if games else None
     
-
-    def convert_board_to_tensor(self, board, winner):
+    @staticmethod
+    def convert_board_to_tensor(board, winner):
         # convert the current board state to a 6x8x8 tensor (1 8x8 board for every figure)
 
         board_state = np.zeros((8, 8, 6), dtype=np.int8)

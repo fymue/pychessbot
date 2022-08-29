@@ -8,11 +8,10 @@
         <h1>PyChessBot</h1>
         <label for="gamemode">Select game mode: PyChessBot vs. </label>
 
-        <form method="POST" id="gameMode" target="hiddenFrame">
+        <form method="POST" id="gameMode" target="hiddenFrame" onsubmit="startGame.disabled = true; newGame.disabled = false; return true;">
             <select name="gamemode" id="gamemode">
-                <option value="player">You</option>
                 <option value="self">Itself</option>
-                <option value="model">Different Model</option>
+                <option value="player">You</option>
                 <option value="sunfish">Sunfish Engine</option>
             </select>
             <input type="submit" id="startGame" value="Start Game">
@@ -21,10 +20,10 @@
         <button id="newGame" disabled>New Game</button>
         <br>
         
-        <form>
+        <form method="POST" id="playMove" target="hiddenFrame">
             <label for="nextMove">Your move:</label>
-            <input type="text" id="nextMove" name="nextMove">
-            <button style="margin-left: 15px;" type="submit">Play move</button>
+            <input type="text" id="nextMove" name="nextMove" placeholder="format like 'd2d4'">
+            <input style="margin-left: 15px;" type="submit" value="Play move" onclick="document.getElementById('playMove').submit(); document.getElementById('nextMove').value = ''; return false;">
         </form>
         <br>
 
