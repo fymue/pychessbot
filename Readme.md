@@ -42,5 +42,5 @@ After this you can run the program directly using one of the existing models fou
 
 The program can either be run from the command line or as a web application in your browser (on localhost:5000) by executing the command
 ```
-python3 play.py
+python3 play.py [-h] [--player] [--self] [--sunfish] [--model model1 model2]
 ```
