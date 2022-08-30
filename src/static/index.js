@@ -2,16 +2,15 @@
 
 const moveHistoryFile = "../static/move_history.txt";
 const iframe = document.getElementById("moveHistory");
+iframe.onload = function () {iframe.contentWindow.scrollTo(0, 99999);}
 const img = document.querySelector("img");
 
 async function updateGame()
 {
     img.src = "../static/board.svg?" + Math.random();
-    iframe.contentWindow.document.open();
     await fetch(moveHistoryFile)
           .then(response => response.text())
-          .then(data => iframe.contentWindow.document.write(data));
-    iframe.contentWindow.document.close();
+          .then(data => iframe.srcdoc = data);
 }
 
 setInterval(updateGame, 1000)
