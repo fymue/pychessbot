@@ -1,7 +1,20 @@
-// refresh board svg image every second (1000 milliseconds)
-const img = document.querySelector("img");
-setInterval(function(){ img.src = "../static/board.svg?" + Math.random();}, 1000)
+// refresh game board svg image and move history every second (1000 milliseconds)
 
+const moveHistoryFile = "../static/move_history.txt";
+const iframe = document.getElementById("moveHistory");
+const img = document.querySelector("img");
+
+async function updateGame()
+{
+    img.src = "../static/board.svg?" + Math.random();
+    iframe.contentWindow.document.open();
+    await fetch(moveHistoryFile)
+          .then(response => response.text())
+          .then(data => iframe.contentWindow.document.write(data));
+    iframe.contentWindow.document.close();
+}
+
+setInterval(updateGame, 1000)
 
 // display/hide "Play move" textfield depending on chosen game mode
 const el = document.getElementById("gamemode");

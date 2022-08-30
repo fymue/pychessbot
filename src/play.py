@@ -23,6 +23,7 @@ class Game:
         self.model_path =  path + "/model/"
         self.bot_move_delay = bot_move_delay
         self.board = None
+        self.update_move_history(None, None) # reset the move history before the start of a new game
         self.update_svg_board(None, "src/static/board.svg") # initialize/update the svg game board as empty
         self.model = self.initialize_model(self.model_path + model)
 
@@ -84,7 +85,7 @@ class Game:
 
         board.push(move)
 
-        move_history += f'[{"WHITE" if turn == chess.WHITE else "BLACK"}] {move.uci()}' + '<br>'
+        Game.update_move_history(move, turn)
 
         if not quiet:
             print(board)
@@ -120,6 +121,17 @@ class Game:
         
         else: 
             return ""
+    
+    @staticmethod
+    def update_move_history(move, turn):
+        # update the move history log file (is being read every second in js and displayed in iframe)
+
+        file_path = path + "/src/static/move_history.txt"
+
+        if move is None: open(file_path, "w").close() # delete the move history if a game ends
+        else:
+            with open(file_path, "a") as fout:
+                fout.write(f'[{"WHITE" if turn == chess.WHITE else "BLACK"}] {move.uci()}' + '<br>')
 
     def play_vs_player(self, quiet=False):
         # play a chess game against the bot
@@ -292,6 +304,7 @@ def start_game():
         move_history = ""
         game = None
         Game.update_svg_board(None, path + "/src/static/board.svg")
+        Game.update_move_history(None, None)
 
     else:
         move = None
@@ -312,6 +325,7 @@ def start_game():
                 return f"Invalid move format '{inp}' (must be like 'b2b4')! Please try again..."
 
         Game.execute_move(move, game.board, quiet=True)
+        move_history += f'[{"WHITE" if game.board.turn == chess.WHITE else "BLACK"}] {move.uci()}' + '<br>'
 
         if game.board.is_game_over() or game.board.is_fifty_moves():  return Game.get_game_result(game.board)
 
@@ -321,6 +335,7 @@ def start_game():
         print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
 
         Game.execute_move(bot_move, game.board, quiet=True)
+        move_history += f'[{"WHITE" if game.board.turn == chess.WHITE else "BLACK"}] {move.uci()}' + '<br>'
 
         if game.board.is_game_over() or game.board.is_fifty_moves(): return Game.get_game_result(game.board)
         
@@ -357,6 +372,7 @@ if __name__ == "__main__":
         elif args.sunfish: game.play_vs_sunfish()
 
     Game.update_svg_board(None, path + "/src/static/board.svg")
+    Game.update_move_history(None, None)
 
         
 
