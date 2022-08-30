@@ -9,7 +9,6 @@ from pgnparser import PGNParser
 from model import Model
 from sys import argv
 
-board = None
 game = None
 
 move_history = ""
@@ -73,6 +72,7 @@ class Game:
     @staticmethod
     def execute_move(move, board, quiet=True):
         # execute a move and print the updated board
+        global move_history
         
         turn = board.turn # whose turn is it?
         is_pawn = board.piece_type_at(move.from_square) == chess.PAWN # is piece thats about to move a pawn?
@@ -83,6 +83,8 @@ class Game:
             move.promotion = chess.QUEEN
 
         board.push(move)
+
+        move_history += f'[{"WHITE" if turn == chess.WHITE else "BLACK"}] {move.uci()}' + '<br>'
 
         if not quiet:
             print(board)
@@ -101,21 +103,23 @@ class Game:
     
     @staticmethod
     def get_game_result(board):
-        res = board.outcome()
+        if game.board.is_game_over() or game.board.is_fifty_moves():
+            res = board.outcome()
 
-        if res.winner is None:
-            winner = "Draw"
-        elif res.winner == chess.WHITE:
-            winner = "White"
-        else:
-            winner = "Black"
+            if res.winner is None:
+                winner = "Draw"
+            elif res.winner == chess.WHITE:
+                winner = "White"
+            else:
+                winner = "Black"
 
-        if res:
-            print(f"Game over! The result of the game is: {res.result()} (Winner: {winner} in {board.fullmove_number} moves)")
-        else:
-            print("The game was stopped due to it probably never coming to an end (over 50 moves played).")
-
-        return
+            if res:
+                return f"Game over! The result of the game is: {res.result()} (Winner: {winner} in {board.fullmove_number} moves)"
+            else:
+                return "The game was stopped due to it probably never coming to an end (over 50 moves played)."
+        
+        else: 
+            return ""
 
     def play_vs_player(self, quiet=False):
         # play a chess game against the bot
@@ -153,7 +157,7 @@ class Game:
 
             self.execute_move(bot_move, self.board, quiet=quiet)
 
-        self.get_game_result(self.board)
+        print(self.get_game_result(self.board))
 
         return
 
@@ -180,7 +184,7 @@ class Game:
             print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
             self.execute_move(bot_move, self.board, quiet=quiet)
         
-        self.get_game_result(self.board)
+        print(self.get_game_result(self.board))
 
         return
     
@@ -215,7 +219,7 @@ class Game:
             print(f"[BLACK] Pychessbot's move (opp model): '{bot_move.uci()}'\n")
             self.execute_move(bot_move, self.board, quiet=quiet)
         
-        self.get_game_result(self.board)
+        print(self.get_game_result(self.board))
 
         return
     
@@ -257,7 +261,7 @@ class Game:
             print(f"[BLACK] Sunfish's move: '{sunfish_move_uci}'\n")
             self.execute_move(chess.Move.from_uci(sunfish_move_uci), self.board, quiet=quiet) # play sunfish's move on main board
         
-        self.get_game_result(self.board)
+        print(self.get_game_result(self.board))
         
         return
 
@@ -266,56 +270,63 @@ def init_page(): return flask.render_template("index.html")
 
 @app.route("/", methods=["GET", "POST"])
 def start_game():
-    global game, board, move_history
+    global game, move_history
 
     select = str(flask.request.form.get("gamemode"))
 
     if not game and select == "sunfish": 
         game = Game("chess_model", bot_move_delay=1)
         game.play_vs_sunfish(quiet=True)
+
     elif not game and select == "self": 
         game = Game("chess_model", bot_move_delay=1)
         game.play_vs_self(quiet=True)
+
     elif not game and select == "player":
         # start a game between a (human) player and PyChessBot
         game = Game("chess_model", bot_move_delay=1)
-        board = chess.Board()
-        Game.update_svg_board(board, path + "/src/static/board.svg")
+        game.board = chess.Board()
+        Game.update_svg_board(game.board, path + "/src/static/board.svg")
+
+    elif flask.request.form.get("reset"):
+        move_history = ""
+        game = None
+        Game.update_svg_board(None, path + "/src/static/board.svg")
+
     else:
         move = None
+        if not game: game = Game("chess_model", bot_move_delay=1)
 
-        inp = str(flask.request.form.get("nextMove"))
+        inp = str(flask.request.form.get("enteredMove"))
 
         while move is None:
             try:
                 # parse the user's move
                 move = chess.Move.from_uci(inp)
 
-                if not board.is_legal(move): 
-                    move = None
+                if not game.board.is_legal(move): 
                     return f"The move '{inp}' is not legal! Please try again..."
+                    move = None
 
             except Exception:
-                return "Invalid move format (must be like 'b2b4')! Please try again..."
+                return f"Invalid move format '{inp}' (must be like 'b2b4')! Please try again..."
 
-        Game.execute_move(move, board, quiet=True)
+        Game.execute_move(move, game.board, quiet=True)
 
-        move_history += move.uci() + "<br>"
+        if game.board.is_game_over() or game.board.is_fifty_moves():  return Game.get_game_result(game.board)
 
-        if board.is_game_over() or board.is_fifty_moves(): Game.get_game_result(board)
-
-        bot_move = Game.predict_best_move(board, game.model)
+        bot_move = Game.predict_best_move(game.board, game.model)
 
         sleep(1)
         print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
 
-        Game.execute_move(bot_move, board, quiet=True)
+        Game.execute_move(bot_move, game.board, quiet=True)
 
-        move_history += bot_move.uci() + "<br>"
-
-        if board.is_game_over() or board.is_fifty_moves(): Game.get_game_result(board)
+        if game.board.is_game_over() or game.board.is_fifty_moves(): return Game.get_game_result(game.board)
         
-    return move_history
+        return move_history
+    
+    return Game.get_game_result(game.board) if game else ""
 
 if __name__ == "__main__":
     

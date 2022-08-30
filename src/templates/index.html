@@ -7,23 +7,30 @@
         <h1>PyChessBot</h1>
         <label for="gamemode">Select game mode: PyChessBot vs. </label>
 
-        <form method="POST" id="gameMode" target="moveHistory" onsubmit="startGame.disabled = true; newGame.disabled = false; return true;">
+        <form method="POST" id="gameModeForm" target="moveHistory">
             <select name="gamemode" id="gamemode">
                 <option value="self">Itself</option>
-                <option value="player">You</option>
+                <option value="player" selected>You</option>
                 <option value="sunfish">Sunfish Engine</option>
             </select>
-            <input type="submit" id="startGame" value="Start Game">
+            <input type="submit" id="startGameButton" value="Start Game">
         </form>
 
-        <button id="newGame" disabled>New Game</button>
+        <form method="POST" id="resetGameForm" target="moveHistory">
+            <select name="reset" id="reset">
+                <option value="yes"></option>
+            </select>
+            <input type="submit" id="resetGameButton" value="Reset Game" disabled="disabled">
+        </form>
         <br>
         
-        <form method="POST" id="playMove" target="moveHistory">
-            <label for="nextMove">Your move:</label>
-            <input type="text" id="nextMove" name="nextMove" placeholder="format like 'd2d4'">
-            <input style="margin-left: 15px;" type="submit" value="Play move" onclick="document.getElementById('playMove').submit(); document.getElementById('nextMove').value = ''; return false;">
-        </form>
+        <div id="playerMoveDiv">
+            <form method="POST" id="playMoveForm" target="moveHistory">
+                <label for="enteredMove">Your move:</label>
+                <input type="text" id="enteredMove" name="enteredMove" placeholder="format like 'd2d4'">
+                <input type="submit" value="Play move" id="playMoveButton" disabled="disabled" style="margin-left: 15px;">
+            </form>
+        </div>
         <br>
 
         <div style="float: left">
@@ -37,8 +44,6 @@
 
     </body>
 
-    <script type="text/javascript">
-        const img = document.querySelector("img");
-        setInterval(function(){ img.src = "../static/board.svg?" + Math.random();}, 1000)
-    </script>
+    <script type="text/javascript" src="../static/index.js"></script>
+
 </html>

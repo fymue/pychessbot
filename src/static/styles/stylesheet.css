@@ -1,8 +1,8 @@
-#startGame
+#startGameButton
 {
     margin: 15px;         
 }
-#gameMode
+#gameModeForm
 {
     display: inline-block;
 }
@@ -10,4 +10,12 @@
 {
     height: 400px;
     width: 400px;
+}
+#reset
+{
+    display: none;
+}
+#resetGameForm
+{
+    display: inline-block;
 }
