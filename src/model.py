@@ -66,7 +66,7 @@ class Model:
         if not X_train: X_train = self.X_train
         if not y_train: y_train = self.y_train
 
-        self.model.fit(X_train, y_train, epochs=10, batch_size=64, validation_split=0.2, shuffle=True, verbose=2)
+        self.model.fit(X_train, y_train, epochs=5, batch_size=128, validation_split=0.2, shuffle=True, verbose=2)
     
     def evaluate(self, X_test=None, y_test=None):
         # test the accuracy of the trained neural network
@@ -82,10 +82,9 @@ class Model:
         self.model.save(self.model_path + name)
 
 if __name__ == "__main__":
-    model = Model(train_data_size=10000)
+    model = Model(train_data_size=1000000)
     model.train()
 
-    # now training, validation and test accuracy reach 100% after only 2 epochs (sth. wrong w/ new data probably?)
     model.evaluate()
     
-    model.save("chess_model")
+    model.save("chess_model_v2")

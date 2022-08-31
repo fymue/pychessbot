@@ -38,7 +38,7 @@ class Game:
         with open(path, "w") as fout: fout.write(chess.svg.board(board))
 
     @staticmethod
-    def predict_best_move(board, model):
+    def predict_best_move(board, model, color):
         # predict the best move from all possible moves
         # based on the current board state
 
@@ -58,7 +58,7 @@ class Game:
 
         for i, move in enumerate(legal_moves):
             board.push(move)
-            possible_boards[i] = PGNParser.convert_board_to_tensor(board, chess.BLACK)
+            possible_boards[i] = PGNParser.convert_board_to_tensor(board, color)
             board.pop()
         
 
@@ -171,7 +171,7 @@ class Game:
             self.move_c = self.execute_move(move, self.board, self.move_c, quiet=quiet)
 
             # let the model predict the best move
-            bot_move = self.predict_best_move(self.board, self.model)
+            bot_move = self.predict_best_move(self.board, self.model, chess.BLACK)
 
             sleep(self.bot_move_delay)
             print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
@@ -195,12 +195,12 @@ class Game:
             # run the loop until the game is over (checkmate)
             
             # ca. 80% of the time, play the best move; ca. 20% of the time, play a random (bad) move
-            bot_move = self.random_move(self.board) if np.random.random() <= 0.2 else self.predict_best_move(self.board, self.model)
+            bot_move = self.random_move(self.board) if np.random.random() <= 0.2 else self.predict_best_move(self.board, self.model, chess.WHITE)
             sleep(self.bot_move_delay)
             print(f"[WHITE] Pychessbot's move: '{bot_move.uci()}'\n")
             self.move_c = self.execute_move(bot_move, self.board, self.move_c, quiet=quiet)
 
-            bot_move = self.random_move(self.board) if np.random.random() <= 0.2 else self.predict_best_move(self.board, self.model)
+            bot_move = self.random_move(self.board) if np.random.random() <= 0.2 else self.predict_best_move(self.board, self.model, chess.WHITE)
             sleep(self.bot_move_delay)
             print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
             self.move_c = self.execute_move(bot_move, self.board, self.move_c, quiet=quiet)
@@ -229,13 +229,13 @@ class Game:
             # run the loop until the game is over (checkmate)
             
             if self.board.fullmove_number == 1: bot_move = self.random_move(self.board)
-            else: bot_move = self.predict_best_move(self.board, model=main_model)
+            else: bot_move = self.predict_best_move(self.board, main_model, chess.WHITE)
 
             sleep(self.bot_move_delay)
             print(f"[WHITE] Pychessbot's move (main model): '{bot_move.uci()}'\n")
             self.move_c = self.execute_move(bot_move, self.board, self.move_c, quiet=quiet)
 
-            bot_move = self.predict_best_move(self.board, model=opp_model)
+            bot_move = self.predict_best_move(self.board, opp_model, chess.BLACK)
             sleep(self.bot_move_delay)
             print(f"[BLACK] Pychessbot's move (opp model): '{bot_move.uci()}'\n")
             self.move_c = self.execute_move(bot_move, self.board, self.move_c, quiet=quiet)
@@ -261,7 +261,7 @@ class Game:
         while not self.board.is_game_over() and not self.board.is_fifty_moves():
             # run the loop until the game is over (checkmate)
 
-            bot_move = self.predict_best_move(self.board, self.model) if self.board.fullmove_number > 1 else self.random_move(self.board)
+            bot_move = self.predict_best_move(self.board, self.model, chess.WHITE) if self.board.fullmove_number > 1 else self.random_move(self.board)
             bot_move_uci = bot_move.uci()
 
             sleep(self.bot_move_delay)
@@ -338,7 +338,7 @@ def run_game():
 
         if game.board.is_game_over() or game.board.is_fifty_moves():  return Game.get_game_result(game.board)
 
-        bot_move = Game.predict_best_move(game.board, game.model)
+        bot_move = Game.predict_best_move(game.board, game.model, chess.BLACK)
 
         sleep(1)
         print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
@@ -373,7 +373,7 @@ if __name__ == "__main__":
 
         args = parser.parse_args()
 
-        game = Game("chess_model")
+        game = Game("chess_model_v2")
 
         if args.player: game.play_vs_player()
         elif args.self: game.play_vs_self()

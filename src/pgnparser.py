@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from re import I
 import chess
 import chess.pgn
 import os
@@ -57,11 +58,11 @@ class PGNParser:
                         good_move_start = 1
                         offset = 0 if len(moves_played) % 2 != 0 else 1
 
-                        game_board.push(moves_played[0]) # play the 1st move since the loop starts at index 1 instead of 0
-
                         random_move = tuple(random_board.pseudo_legal_moves)[np.random.randint(0, random_board.pseudo_legal_moves.count())]
                         random_board.push(random_move)
-                        bad_board_state = self.convert_board_to_tensor(random_board, winner)
+                        bad_board_state = self.convert_board_to_tensor(random_board, chess.WHITE)
+
+                        game_board.push(moves_played[0]) # play the 1st move since the loop starts at index 1 instead of 0
 
                         X[i] = bad_board_state
                         y[i] = 0
@@ -72,11 +73,6 @@ class PGNParser:
                         # for bad moves, make a random move from all possible moves of the current board state 
                         # (because all games are GrandMaster games and thus (early) moves are not necessarily bad)
 
-                        # play the next move of the game and convert the resulting board state to a tensor
-                        
-                        game_board.push(moves_played[move])
-                        good_board_state = self.convert_board_to_tensor(game_board, winner)
-
                         # set the random board (for the random, "bad" moves) to the current state of the game board,
                         # execute a random "bad" move and convert the resulting board state to a tensor 
                         random_board.set_fen(game_board.fen())
@@ -85,7 +81,12 @@ class PGNParser:
 
                         bad_board_state = self.convert_board_to_tensor(random_board, winner)
 
-                        # play the actual next move in the game so the actual next move is correct
+                        # play the next move of the game and convert the resulting board state to a tensor
+                        
+                        game_board.push(moves_played[move])
+                        good_board_state = self.convert_board_to_tensor(game_board, winner)
+
+                        # play the next move as well (for which we did a random move) so the board stays correct
                         game_board.push(moves_played[move+1]) 
 
                         X[i] = good_board_state
@@ -143,7 +144,7 @@ class PGNParser:
                 
                 total_moves = len(tuple(game.mainline_moves())) # total moves of this game
 
-                if winner and total_moves >= 2: 
+                if winner is not None and total_moves >= 2: 
                     # store the current game and winner 
                     # (only if game ended in checkmate and game was "valid" 
                     # ( -> min. 2 moves; sometimes PGN contains falsely formatted games))
@@ -166,16 +167,31 @@ class PGNParser:
         return games if games else None
     
     @staticmethod
-    def convert_board_to_tensor(board, winner):
-        # convert the current board state to a 6x8x8 tensor (1 8x8 board for every figure)
+    def convert_board_to_tensor(board, color):
+        # convert the current board state to a 8x8x6 tensor (1 8x8 board for every figure)
+        # the ANN is supposed to learn "good" white board positions
 
         board_state = np.zeros((8, 8, 6), dtype=np.int8)
+        
+
         piece_map = board.piece_map()
 
-        white_val = 1 if winner == chess.WHITE else -1
+        white_val = 1
+
+        if color == chess.BLACK:
+            # if black won the game, flip the board
+            # so the "good" board positions look like as if white played the move
+            board = board.transform(chess.flip_vertical)
+            white_val = -1
+
         black_val = -white_val
 
         layer_indices = {"k" : 0, "p" : 1, "r" : 2, "b" : 3, "n" : 4, "q" : 5}
+
+        layer_indices2 = {"k" : 0, "p" : 1, "r" : 2, "b" : 3, "n" : 4, "q" : 5,
+                         "K" : 6, "P" : 7, "R" : 8, "B" : 9, "N" : 10, "Q" : 11}
+
+        values = {"p" : 1, "n" : 3, "b" : 3, "r" : 5, "q" : 9, "k" : 10}
 
         for pos in piece_map:
             curr_piece = piece_map[pos].symbol()
@@ -185,10 +201,9 @@ class PGNParser:
             col = pos % 8
             layer = layer_indices[curr_piece.lower()]
 
+            # pieces of winning color get 1, pieces of losing color get -1
             board_state[row, col, layer] = white_val if curr_piece.isupper() else black_val
         
-        #board_state[:, :, 6] = board.turn * 1.0 # last dimension represents who's turn it is
-
         return board_state
 
     def save_training_data(self, X, y):
@@ -196,8 +211,6 @@ class PGNParser:
         # so it doesn't have to be recalculated every time
 
         np.savez_compressed(f"{self.data_path}training_data_{self.max_size}", X=X, y=y)
-
-        
 
 if __name__ == "__main__": 
     pgn_parser = PGNParser(max_size=1000000)
