@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from re import I
 import chess
 import chess.pgn
 import os
@@ -173,9 +172,6 @@ class PGNParser:
 
         board_state = np.zeros((8, 8, 6), dtype=np.int8)
         
-
-        piece_map = board.piece_map()
-
         white_val = 1
 
         if color == chess.BLACK:
@@ -183,6 +179,8 @@ class PGNParser:
             # so the "good" board positions look like as if white played the move
             board = board.transform(chess.flip_vertical)
             white_val = -1
+
+        piece_map = board.piece_map() # get position of every figure (after potential flip)
 
         black_val = -white_val
 

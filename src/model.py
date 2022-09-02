@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import tensorflow as tf
-import os
 import numpy as np
 from tensorflow.keras import layers
 from pathlib import Path

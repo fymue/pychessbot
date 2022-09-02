@@ -41,5 +41,5 @@ pip install -r requirements.txt
 
 The program can either be run from the command line or as a web application in your browser (on localhost:5000) by executing the command
 ```
-python3 play.py [-h] [--player] [--self] [--sunfish] [--model model1 model2]
+python3 src/play.py [-h] [--player] [--self] [--sunfish] [--model model1 model2]
 ```

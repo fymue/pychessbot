@@ -50,7 +50,7 @@ class Game:
             # play one of those (means that the game is over)
             pseudo_legal_moves = board.pseudo_legal_moves
             legal_moves_uci = {move.uci() for move in legal_moves}
-            pseudo_legal_moves_uci = {move.uci for move in pseudo_legal_moves}
+            pseudo_legal_moves_uci = {move.uci() for move in pseudo_legal_moves}
             legal_moves = [chess.Move.from_uci(move) for move in legal_moves_uci ^ pseudo_legal_moves_uci]
 
         # calculate the board state tensor for every possible move
@@ -296,16 +296,16 @@ def run_game():
     select = str(flask.request.form.get("gamemode"))
 
     if not game and select == "sunfish": 
-        game = Game("chess_model", bot_move_delay=1)
+        game = Game("chess_model_v2", bot_move_delay=1)
         game.play_vs_sunfish(quiet=True)
 
     elif not game and select == "self": 
-        game = Game("chess_model", bot_move_delay=1)
+        game = Game("chess_model_v2", bot_move_delay=1)
         game.play_vs_self(quiet=True)
 
     elif not game and select == "player":
         # start a game between a (human) player and PyChessBot
-        game = Game("chess_model", bot_move_delay=1)
+        game = Game("chess_model_v2", bot_move_delay=1)
         game.board = chess.Board()
         Game.update_svg_board(game.board, path + "/src/static/board.svg")
 
@@ -317,7 +317,7 @@ def run_game():
 
     else:
         move = None
-        if not game: game = Game("chess_model", bot_move_delay=1)
+        if not game: game = Game("chess_model_v2", bot_move_delay=1)
 
         inp = str(flask.request.form.get("enteredMove"))
 
