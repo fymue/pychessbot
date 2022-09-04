@@ -17,6 +17,9 @@ app = flask.Flask(__name__)
 path = str(Path(__file__).parents[1])
 
 class Game:
+
+    depth = 0
+
     def __init__(self, model, bot_move_delay=0):
         # load a model stored in model/, create an empty board to play on
 
@@ -36,14 +39,62 @@ class Game:
     @staticmethod
     def update_svg_board(board, path):
         with open(path, "w") as fout: fout.write(chess.svg.board(board))
+    
+    @staticmethod
+    def evaluate_board_state(board, model, color):
+        # calculate model output for a board state/position
+
+        board_state = PGNParser.convert_board_to_tensor(board, color)
+        board_state = board_state.reshape((1,) + board_state.shape)
+        return model.predict(board_state, verbose=0)
+
+    @staticmethod
+    def alpha_beta(depth, board, model, color, alpha, beta, maximizing_player):
+        # alpha beta pruning algorithm (determines best move to play)
+        print("called alpha beta")
+
+        if depth == 0: return Game.evaluate_board_state(board, model, color)
+        
+        legal_moves = board.legal_moves
+
+        if maximizing_player:
+            val = np.NINF
+
+            for move in legal_moves:
+                board.push(move)
+                val = max(val, Game.alpha_beta(depth-1, board, model, color, alpha, beta, False))
+                board.pop()
+
+                alpha = max(alpha, val)
+
+                if val >= beta: break
+            
+            return val
+        
+        else:
+            val = np.Inf
+
+            for move in legal_moves:
+                board.push(move)
+                val = min(val, Game.alpha_beta(depth-1, board, model, color, alpha, beta, True))
+                board.pop()
+
+                beta = min(beta, val)
+
+                if val <= alpha: break
+
+            return val
+
 
     @staticmethod
     def predict_best_move(board, model, color):
         # predict the best move from all possible moves
         # based on the current board state
+        # using additional alpha-beta-pruning if depth is bigger 0
 
         # get all legal moves from here (excluding moves that put the king in check)
         legal_moves = tuple(board.legal_moves)
+        print(Game.depth)
 
         if not legal_moves:
             # if no moves that don't put the king in check are possible,
@@ -64,11 +115,29 @@ class Game:
 
         # find the move that resulted in the biggest output value
         # and assume, that that move is the best one
-        vals_of_boards = model.predict(possible_boards, verbose=0)
-        best_move_i = np.argmax(vals_of_boards)
-        best_move = legal_moves[best_move_i]
-        val_of_best_move = vals_of_boards[best_move_i]
-        
+        vals_of_moves = model.predict(possible_boards, verbose=0).flatten()
+        best_moves_i = np.argsort(vals_of_moves) # sort scores by index ascending
+
+        best_move = legal_moves[best_moves_i[-1]]
+
+        if Game.depth > 0:
+            # if user entered depth bigger than 0,
+            # run additional alpha-beta-pruning to
+            # search the game tree for a better move
+            # until the max depth is reached
+
+            best_move_val = np.NINF
+
+            # only search the game tree starting with the 4 best moves
+            for move_i in best_moves_i[best_moves_i.size-4:]:
+                curr_move = legal_moves[move_i]
+
+                board.push(legal_moves[move_i])
+                curr_move_val = Game.alpha_beta(Game.depth, board, model, color, np.NINF, np.Inf, True)
+                board.pop()
+
+                if curr_move_val > best_move_val: best_move = curr_move
+
         return best_move
 
     @staticmethod
@@ -358,27 +427,33 @@ if __name__ == "__main__":
     # (if no argument -> launch GUI as webpage on localhost:5000)
     # (else: play/watch a game on the command line)
 
-    passed_mode_args = len([True for el in argv if el[0] == "-"])
+    game_mode_args = {"--player", "-p", "--self", "-s", "--sunfish", "-sf", "--model", "-m"}
 
-    if len(argv) == 1: 
-        app.run()
-    elif passed_mode_args > 1:
-        print(f"Please provide at most 1 game mode option (found {passed_mode_args})!")
+    total_game_mode_args = sum((1 for arg in argv if arg in game_mode_args))
+
+    if total_game_mode_args > 1: 
+        print(f"Please provide at most 1 game mode option (found {total_game_mode_args})!")
     else:
         parser = argparse.ArgumentParser()
         parser.add_argument("--player", "-p", action="store_true", help="Start a new game between PyChessBot vs. a player (you)")
         parser.add_argument("--self", "-s", action="store_true", help="Let PyChessBot play a game against itself")
         parser.add_argument("--sunfish", "-sf", action="store_true", help="Let PyChessBot play a game against the Sunfish engine")
         parser.add_argument("--model", "-m", nargs=2, metavar=("model1", "model2"), type=str, help="Let two models from pychessbot/model/ play against each other")
+        parser.add_argument("--depth", "-d", metavar="N", type=int, help="search depth for best move prediction")
 
         args = parser.parse_args()
 
-        game = Game("chess_model_v2")
+        if args.depth: Game.depth = args.depth
 
-        if args.player: game.play_vs_player()
-        elif args.self: game.play_vs_self()
-        elif args.model: game.play_vs_model(args.model[1], args.model[0])
-        elif args.sunfish: game.play_vs_sunfish()
+        if total_game_mode_args == 0: app.run()
+
+        else:
+            game = Game("chess_model_v2")
+
+            if args.player: game.play_vs_player()
+            elif args.self: game.play_vs_self()
+            elif args.model: game.play_vs_model(args.model[1], args.model[0])
+            elif args.sunfish: game.play_vs_sunfish()
 
     Game.update_svg_board(None, path + "/src/static/board.svg")
     Game.update_move_history(None, None, None)
