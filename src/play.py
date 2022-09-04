@@ -49,18 +49,17 @@ class Game:
         return model.predict(board_state, verbose=0)
 
     @staticmethod
-    def alpha_beta(depth, board, model, color, alpha, beta, maximizing_player):
+    def alpha_beta(depth, board, model, color, alpha, beta, maximizing_player, n=5):
         # alpha beta pruning algorithm (determines best move to play)
-        print("called alpha beta")
 
         if depth == 0: return Game.evaluate_board_state(board, model, color)
         
-        legal_moves = board.legal_moves
+        moves_to_check = Game.calc_move_scores(board, model, color, n) # only pick best n moves to further evaluate (to save time)
 
         if maximizing_player:
             val = np.NINF
 
-            for move in legal_moves:
+            for move in moves_to_check:
                 board.push(move)
                 val = max(val, Game.alpha_beta(depth-1, board, model, color, alpha, beta, False))
                 board.pop()
@@ -74,7 +73,7 @@ class Game:
         else:
             val = np.Inf
 
-            for move in legal_moves:
+            for move in moves_to_check:
                 board.push(move)
                 val = min(val, Game.alpha_beta(depth-1, board, model, color, alpha, beta, True))
                 board.pop()
@@ -85,26 +84,22 @@ class Game:
 
             return val
 
-
     @staticmethod
-    def predict_best_move(board, model, color):
-        # predict the best move from all possible moves
-        # based on the current board state
-        # using additional alpha-beta-pruning if depth is bigger 0
+    def calc_move_scores(board, model, color, n=1):
+        # calculate the scores of all possible moves
+        # and return the best n moves (sorted by score)
 
-        # get all legal moves from here (excluding moves that put the king in check)
-        legal_moves = tuple(board.legal_moves)
-        print(Game.depth)
+        legal_moves = np.array(tuple(board.legal_moves))
 
-        if not legal_moves:
+        if legal_moves.size == 0:
             # if no moves that don't put the king in check are possible,
             # play one of those (means that the game is over)
+
             pseudo_legal_moves = board.pseudo_legal_moves
             legal_moves_uci = {move.uci() for move in legal_moves}
             pseudo_legal_moves_uci = {move.uci() for move in pseudo_legal_moves}
-            legal_moves = [chess.Move.from_uci(move) for move in legal_moves_uci ^ pseudo_legal_moves_uci]
+            legal_moves = np.array([chess.Move.from_uci(move) for move in legal_moves_uci ^ pseudo_legal_moves_uci])
 
-        # calculate the board state tensor for every possible move
         possible_boards = np.empty((len(legal_moves), 8, 8, 6))
 
         for i, move in enumerate(legal_moves):
@@ -118,7 +113,18 @@ class Game:
         vals_of_moves = model.predict(possible_boards, verbose=0).flatten()
         best_moves_i = np.argsort(vals_of_moves) # sort scores by index ascending
 
-        best_move = legal_moves[best_moves_i[-1]]
+        best_n_moves = legal_moves[best_moves_i[best_moves_i.size - n:]]
+
+        return best_n_moves
+
+    @staticmethod
+    def predict_best_move(board, model, color):
+        # predict the best move from all possible moves
+        # based on the current board state
+        # using additional alpha-beta-pruning if depth is bigger 0
+
+        best_5_moves = Game.calc_move_scores(board, model, color, n=5) # calculate 5 best moves based on model output
+        best_move = best_5_moves[-1]
 
         if Game.depth > 0:
             # if user entered depth bigger than 0,
@@ -128,11 +134,10 @@ class Game:
 
             best_move_val = np.NINF
 
-            # only search the game tree starting with the 4 best moves
-            for move_i in best_moves_i[best_moves_i.size-4:]:
-                curr_move = legal_moves[move_i]
+            # only search the game tree starting with the 5 best moves
+            for curr_move in best_5_moves:
 
-                board.push(legal_moves[move_i])
+                board.push(curr_move)
                 curr_move_val = Game.alpha_beta(Game.depth, board, model, color, np.NINF, np.Inf, True)
                 board.pop()
 
