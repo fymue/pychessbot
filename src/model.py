@@ -12,9 +12,10 @@ class Model:
 
         self.train_data_size = train_data_size
 
-        self.parent_path = str(Path(__file__).parents[1]) 
-        self.data_path = self.parent_path + "/data/" # path to data folder containing the training data
-        self.model_path = self.parent_path + "/model/"
+        self.parent_path = Path(__file__).absolute().parent.parent
+        # path to data folder containing the training data
+        self.data_path = self.parent_path.joinpath("data").as_posix() + "/"
+        self.model_path = self.parent_path.joinpath("model").as_posix() + "/"
 
         self.X_train, self.y_train, self.X_test, self.y_test = self.load_data(self.data_path)
         self.input_dims = self.X_train.shape[1:]

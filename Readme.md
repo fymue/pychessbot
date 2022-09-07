@@ -28,11 +28,14 @@ The most convenient way to install/run this project is to run it inside a contai
 ```
 (docker|podman) build -t imagename .
 ```
-After that you can use this image to build and (interactively) execute a container, from which the program can be run.
+After that you can use this image to build and execute a container, in which the program will be executed (in UI mode).
 ```
-(docker|podman) run -it imagename bash
+(docker|podman) run -p 5000:5000 imagename
 ```
-Inside this container you can now run the program without having to globally install any dependencies. 
+You can also interactively enter a container and run all scripts directly (from the command line) without having to globally install any dependencies. 
+```
+(docker|podman) run -p 5000:5000 -it imagename bash
+```
 
 ### From source
 
@@ -45,5 +48,5 @@ pip install -r requirements.txt
 
 The program can either be run from the command line or as a web application in your browser (on localhost:5000) by executing the command
 ```
-python3 src/play.py [-h] [--player] [--self] [--sunfish] [--model model1 model2]
+./play.py [-h] [--player] [--self] [--sunfish] [--model model1 model2]
 ```

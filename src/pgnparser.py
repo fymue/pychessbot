@@ -12,7 +12,8 @@ class PGNParser:
         self.size = 0 # will be set after parge_pgn() gets called in parse_pgns()
 
         if auto:
-            self.data_path = str(Path(__file__).parents[1]) + "/data/" # path to data folder containing all games in pgn format
+            # path to data folder containing all games in pgn format
+            self.data_path = Path(__file__).parent.parent.joinpath("data").as_posix() + "/"
             self.X, self.y = self.parse_pgns(self.data_path) # store every board state as well as the "goodness" of the state
 
     def parse_pgns(self, pgn_dir):
@@ -211,5 +212,5 @@ class PGNParser:
         np.savez_compressed(f"{self.data_path}training_data_{self.max_size}", X=X, y=y)
 
 if __name__ == "__main__": 
-    pgn_parser = PGNParser(max_size=1000000)
+    pgn_parser = PGNParser(max_size=10000)
     pgn_parser.save_training_data(pgn_parser.X, pgn_parser.y)

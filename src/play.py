@@ -13,8 +13,9 @@ game = None
 
 move_history = ""
 
+path = Path(__file__).absolute().parent.parent
+
 app = flask.Flask(__name__)
-path = str(Path(__file__).parents[1])
 
 class Game:
 
@@ -23,12 +24,12 @@ class Game:
     def __init__(self, model, bot_move_delay=0):
         # load a model stored in model/, create an empty board to play on
 
-        self.model_path =  path + "/model/"
+        self.model_path = path.joinpath("model").as_posix() + "/"
         self.bot_move_delay = bot_move_delay
         self.board = None
         self.move_c = 1
         self.update_move_history(None, None, None) # reset the move history before the start of a new game
-        self.update_svg_board(None, "src/static/board.svg") # initialize/update the svg game board as empty
+        self.update_svg_board(None) # initialize/update the svg game board as empty
         self.model = self.initialize_model(self.model_path + model)
 
     def initialize_model(self, model_path):
@@ -37,8 +38,8 @@ class Game:
         return keras.models.load_model(model_path)
 
     @staticmethod
-    def update_svg_board(board, path):
-        with open(path, "w") as fout: fout.write(chess.svg.board(board))
+    def update_svg_board(board):
+        with open(path.joinpath("src/static/board.svg"), "w") as fout: fout.write(chess.svg.board(board))
     
     @staticmethod
     def evaluate_board_state(board, model, color):
@@ -166,7 +167,7 @@ class Game:
             print(board)
             print()
         
-        Game.update_svg_board(board, path + "/src/static/board.svg")
+        Game.update_svg_board(board)
 
         return move_c + 1
     
@@ -200,7 +201,7 @@ class Game:
         else: 
             res_msg = ""
 
-        with open(path + "/src/static/move_history.txt", "a") as fout:
+        with open(path.joinpath("src/static/move_history.txt"), "a") as fout:
             fout.write(res_msg)
 
         return res_msg
@@ -209,7 +210,7 @@ class Game:
     def update_move_history(move, move_c, turn):
         # update the move history log file (is being read every second in js and displayed in iframe)
 
-        file_path = path + "/src/static/move_history.txt"
+        file_path = path.joinpath("src/static/move_history.txt")
 
         if move is None: open(file_path, "w").close() # delete the move history if a game ends
         else:
@@ -248,7 +249,7 @@ class Game:
             bot_move = self.predict_best_move(self.board, self.model, chess.BLACK)
 
             sleep(self.bot_move_delay)
-            print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
+            print(f"{self.move_c + 1}. [BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
 
             self.move_c = self.execute_move(bot_move, self.board, self.move_c,quiet=quiet)
 
@@ -271,12 +272,12 @@ class Game:
             # ca. 80% of the time, play the best move; ca. 20% of the time, play a random (bad) move
             bot_move = self.random_move(self.board) if np.random.random() <= 0.2 else self.predict_best_move(self.board, self.model, chess.WHITE)
             sleep(self.bot_move_delay)
-            print(f"[WHITE] Pychessbot's move: '{bot_move.uci()}'\n")
+            print(f"{self.move_c + 1}. [WHITE] Pychessbot's move: '{bot_move.uci()}'\n")
             self.move_c = self.execute_move(bot_move, self.board, self.move_c, quiet=quiet)
 
             bot_move = self.random_move(self.board) if np.random.random() <= 0.2 else self.predict_best_move(self.board, self.model, chess.WHITE)
             sleep(self.bot_move_delay)
-            print(f"[BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
+            print(f"{self.move_c + 1}. [BLACK] Pychessbot's move: '{bot_move.uci()}'\n")
             self.move_c = self.execute_move(bot_move, self.board, self.move_c, quiet=quiet)
         
         print(self.get_game_result(self.board))
@@ -306,12 +307,12 @@ class Game:
             else: bot_move = self.predict_best_move(self.board, main_model, chess.WHITE)
 
             sleep(self.bot_move_delay)
-            print(f"[WHITE] Pychessbot's move (main model): '{bot_move.uci()}'\n")
+            print(f"{self.move_c + 1}. [WHITE] Pychessbot's move (main model): '{bot_move.uci()}'\n")
             self.move_c = self.execute_move(bot_move, self.board, self.move_c, quiet=quiet)
 
             bot_move = self.predict_best_move(self.board, opp_model, chess.BLACK)
             sleep(self.bot_move_delay)
-            print(f"[BLACK] Pychessbot's move (opp model): '{bot_move.uci()}'\n")
+            print(f"{self.move_c + 1}. [BLACK] Pychessbot's move (opp model): '{bot_move.uci()}'\n")
             self.move_c = self.execute_move(bot_move, self.board, self.move_c, quiet=quiet)
         
         print(self.get_game_result(self.board))
@@ -330,8 +331,6 @@ class Game:
             print(self.board)
             print()
 
-        move_c = 0
-
         while not self.board.is_game_over() and not self.board.is_fifty_moves():
             # run the loop until the game is over (checkmate)
 
@@ -339,7 +338,7 @@ class Game:
             bot_move_uci = bot_move.uci()
 
             sleep(self.bot_move_delay)
-            print(f"[WHITE] Pychessbot's move: '{bot_move_uci}'\n")
+            print(f"{self.move_c + 1}. [WHITE] Pychessbot's move: '{bot_move_uci}'\n")
             self.move_c = self.execute_move(bot_move, self.board, self.move_c, quiet=quiet)
 
             start_sq, end_sq = bot_move_uci[:2], bot_move_uci[2:] # start square and end square of last pychessbot move
@@ -353,7 +352,7 @@ class Game:
             # adjust move to match turn (black) and convert sunfish move to python-chess move
             sunfish_move_uci = sunfish.render(119-sunfish_move[0]) + sunfish.render(119-sunfish_move[1])
             
-            print(f"[BLACK] Sunfish's move: '{sunfish_move_uci}'\n")
+            print(f"{self.move_c + 1}. [BLACK] Sunfish's move: '{sunfish_move_uci}'\n")
             self.move_c = self.execute_move(chess.Move.from_uci(sunfish_move_uci), self.board, self.move_c, quiet=quiet) # play sunfish's move on main board
         
         print(self.get_game_result(self.board))
@@ -381,12 +380,12 @@ def run_game():
         # start a game between a (human) player and PyChessBot
         game = Game("chess_model_v2", bot_move_delay=1)
         game.board = chess.Board()
-        Game.update_svg_board(game.board, path + "/src/static/board.svg")
+        Game.update_svg_board(game.board)
 
     elif flask.request.form.get("reset"):
         move_history = ""
         game = None
-        Game.update_svg_board(None, path + "/src/static/board.svg")
+        Game.update_svg_board(None)
         Game.update_move_history(None, None, None)
 
     else:
@@ -450,7 +449,7 @@ if __name__ == "__main__":
 
         if args.depth: Game.depth = args.depth
 
-        if total_game_mode_args == 0: app.run()
+        if total_game_mode_args == 0: app.run(host="0.0.0.0", port=5000)
 
         else:
             game = Game("chess_model_v2")
@@ -460,7 +459,7 @@ if __name__ == "__main__":
             elif args.model: game.play_vs_model(args.model[1], args.model[0])
             elif args.sunfish: game.play_vs_sunfish()
 
-    Game.update_svg_board(None, path + "/src/static/board.svg")
+    Game.update_svg_board(None)
     Game.update_move_history(None, None, None)
 
         
